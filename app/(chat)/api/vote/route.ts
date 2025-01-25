@@ -34,11 +34,12 @@ export async function PATCH(request: Request) {
 
   const session = await auth();
 
-  if (!session || !session.user || !session.user.email) {
+  if (!session?.user?.id || !session.user.email) {
     return new Response('Unauthorized', { status: 401 });
   }
 
   await voteMessage({
+    userId: session.user.id,
     chatId,
     messageId,
     type: type,

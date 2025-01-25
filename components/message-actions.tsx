@@ -67,6 +67,7 @@ export function PureMessageActions({
                 const upvote = fetch('/api/vote', {
                   method: 'PATCH',
                   body: JSON.stringify({
+                    userId: vote?.userId,
                     chatId,
                     messageId,
                     type: 'up',
@@ -76,11 +77,13 @@ export function PureMessageActions({
                 toast.promise(upvote, {
                   loading: 'Upvoting Response...',
                   success: () => {
-                    mutate<Array<Vote>>(
-                      `/api/vote?chatId=${chatId}`,
-                      (currentVotes) => {
+                    mutate(
+                      `/api/vote?chatId=${chatId}` as keyof typeof mutate,
+                      (currentVotes: Array<Vote> | undefined) => {
                         if (!currentVotes) return [];
+                        if (!currentVotes.length) return [];
 
+                        const userId = currentVotes[0].userId;
                         const votesWithoutCurrent = currentVotes.filter(
                           (vote) => vote.messageId !== message.id,
                         );
@@ -88,6 +91,7 @@ export function PureMessageActions({
                         return [
                           ...votesWithoutCurrent,
                           {
+                            userId,
                             chatId,
                             messageId: message.id,
                             isUpvoted: true,
@@ -121,6 +125,7 @@ export function PureMessageActions({
                 const downvote = fetch('/api/vote', {
                   method: 'PATCH',
                   body: JSON.stringify({
+                    userId: vote?.userId,
                     chatId,
                     messageId,
                     type: 'down',
@@ -130,11 +135,13 @@ export function PureMessageActions({
                 toast.promise(downvote, {
                   loading: 'Downvoting Response...',
                   success: () => {
-                    mutate<Array<Vote>>(
-                      `/api/vote?chatId=${chatId}`,
-                      (currentVotes) => {
+                    mutate(
+                      `/api/vote?chatId=${chatId}` as keyof typeof mutate,
+                      (currentVotes: Array<Vote> | undefined) => {
                         if (!currentVotes) return [];
+                        if (!currentVotes.length) return [];
 
+                        const userId = currentVotes[0].userId;
                         const votesWithoutCurrent = currentVotes.filter(
                           (vote) => vote.messageId !== message.id,
                         );
@@ -142,6 +149,7 @@ export function PureMessageActions({
                         return [
                           ...votesWithoutCurrent,
                           {
+                            userId,
                             chatId,
                             messageId: message.id,
                             isUpvoted: false,

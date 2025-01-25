@@ -2,8 +2,6 @@ import 'server-only';
 
 import { genSaltSync, hashSync } from 'bcrypt-ts';
 import { and, asc, desc, eq, gt, gte } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
 
 import {
   user,
@@ -17,15 +15,7 @@ import {
   vote,
 } from './schema';
 import { BlockKind } from '@/components/block';
-
-// Optionally, if not using email/pass login, you can
-// use the Drizzle adapter for Auth.js / NextAuth
-// https://authjs.dev/reference/adapter/drizzle
-
-// biome-ignore lint: Forbidden non-null assertion.
-const client = postgres(process.env.POSTGRES_URL!);
-const db = drizzle(client);
-
+import { db } from './client';
 export async function getUser(email: string): Promise<Array<User>> {
   try {
     return await db.select().from(user).where(eq(user.email, email));
@@ -127,10 +117,12 @@ export async function getMessagesByChatId({ id }: { id: string }) {
 }
 
 export async function voteMessage({
+  userId,
   chatId,
   messageId,
   type,
 }: {
+  userId: string;
   chatId: string;
   messageId: string;
   type: 'up' | 'down';
@@ -148,6 +140,7 @@ export async function voteMessage({
         .where(and(eq(vote.messageId, messageId), eq(vote.chatId, chatId)));
     }
     return await db.insert(vote).values({
+      userId,
       chatId,
       messageId,
       isUpvoted: type === 'up',
@@ -327,4 +320,34 @@ export async function updateChatVisiblityById({
     console.error('Failed to update chat visibility in database');
     throw error;
   }
+}
+
+export async function upsertVote({
+  userId,
+  chatId,
+  messageId,
+  type,
+}: {
+  userId: string;
+  chatId: string;
+  messageId: string;
+  type: 'up' | 'down';
+}) {
+  const existingVote = await db
+    .select()
+    .from(vote)
+    .where(and(eq(vote.messageId, messageId), eq(vote.chatId, chatId)));
+
+  if (existingVote.length > 0) {
+    return await db
+      .update(vote)
+      .set({ isUpvoted: type === 'up' })
+      .where(and(eq(vote.messageId, messageId), eq(vote.chatId, chatId)));
+  }
+  return await db.insert(vote).values({
+    userId,
+    chatId,
+    messageId,
+    isUpvoted: type === 'up',
+  });
 }
