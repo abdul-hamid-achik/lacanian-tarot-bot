@@ -10,7 +10,7 @@ if (process.env.NODE_ENV !== 'production') {
     config({ path: '.env.local' });
 }
 
-const runSeed = async () => {
+export async function runSeed() {
     if (!process.env.POSTGRES_URL) {
         throw new Error('POSTGRES_URL is not defined');
     }
@@ -52,12 +52,13 @@ const runSeed = async () => {
         // Always close the client
         await client.end();
     }
+}
 
-    process.exit(0);
-};
-
-runSeed().catch((err) => {
-    console.error('❌ Seeding failed');
-    console.error(err);
-    process.exit(1);
-});
+// Only run immediately if this is the main module
+if (require.main === module) {
+    runSeed().catch((err) => {
+        console.error('❌ Seeding failed');
+        console.error(err);
+        process.exit(1);
+    });
+}

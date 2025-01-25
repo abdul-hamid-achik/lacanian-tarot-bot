@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { migrate as drizzleMigrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
 import { config } from 'dotenv';
 
@@ -8,7 +8,7 @@ if (process.env.NODE_ENV !== 'production') {
   config({ path: '.env.local' });
 }
 
-const runMigrate = async () => {
+export async function migrate() {
   if (!process.env.POSTGRES_URL) {
     throw new Error('POSTGRES_URL is not defined');
   }
@@ -24,21 +24,23 @@ const runMigrate = async () => {
     console.log('✅ Vector extension check completed');
   } catch (err) {
     console.error('Failed to create vector extension:', err);
-    process.exit(1);
+    throw err;
   }
 
   const start = Date.now();
-  await migrate(db, { migrationsFolder: './lib/db/migrations' });
+  await drizzleMigrate(db, { migrationsFolder: './lib/db/migrations' });
   const end = Date.now();
 
   console.log('✅ Migrations completed in', end - start, 'ms');
 
   await sql.end();
-  process.exit(0);
-};
+}
 
-runMigrate().catch((err) => {
-  console.error('❌ Migration failed');
-  console.error(err);
-  process.exit(1);
-});
+// Only run immediately if this is the main module
+if (require.main === module) {
+  migrate().catch((err) => {
+    console.error('❌ Migration failed');
+    console.error(err);
+    process.exit(1);
+  });
+}
