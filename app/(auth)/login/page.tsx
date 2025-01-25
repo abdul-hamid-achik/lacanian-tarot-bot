@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { AuthForm } from '@/components/auth-form';
 import { SubmitButton } from '@/components/submit-button';
+import { signIn } from 'next-auth/react';
 
 import { login, type LoginActionState } from '../actions';
 
@@ -39,6 +40,10 @@ export default function Page() {
     formAction(formData);
   };
 
+  const handleDevLogin = async () => {
+    await signIn('credentials', { callbackUrl: '/chat' });
+  };
+
   return (
     <div className="flex h-dvh w-screen items-start pt-12 md:pt-0 md:items-center justify-center bg-background">
       <div className="w-full max-w-md overflow-hidden rounded-2xl flex flex-col gap-12">
@@ -50,6 +55,15 @@ export default function Page() {
         </div>
         <AuthForm action={handleSubmit} defaultEmail={email}>
           <SubmitButton isSuccessful={isSuccessful}>Sign in</SubmitButton>
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              type="button"
+              onClick={handleDevLogin}
+              className="mt-4 w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded"
+            >
+              Development Login
+            </button>
+          )}
           <p className="text-center text-sm text-gray-600 mt-4 dark:text-zinc-400">
             {"Don't have an account? "}
             <Link

@@ -50,9 +50,17 @@ export function Chat({
     },
   });
 
+  // Only fetch votes if the chat is not readonly and there are messages
+  const shouldFetchVotes = !isReadonly && messages.length > 0;
   const { data: votes } = useSWR<Array<Vote>>(
-    `/api/vote?chatId=${id}`,
+    shouldFetchVotes ? `/api/vote?chatId=${id}` : null,
     fetcher,
+    {
+      revalidateOnFocus: false, // Don't revalidate when window regains focus
+      revalidateOnReconnect: false, // Don't revalidate when browser regains connection
+      refreshInterval: 0, // Don't poll for updates
+      dedupingInterval: 2000, // Dedupe requests within 2 seconds
+    }
   );
 
   const [attachments, setAttachments] = useState<Array<Attachment>>([]);

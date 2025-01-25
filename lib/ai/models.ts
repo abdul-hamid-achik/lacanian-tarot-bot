@@ -10,16 +10,16 @@ export interface Model {
 export const models: Array<Model> = [
   {
     id: 'gpt-4o-mini',
-    label: 'GPT 4o mini',
+    label: 'Casual',
     apiIdentifier: 'gpt-4o-mini',
-    description: 'Small model for fast, lightweight tasks',
+    description: 'Quick tarot insights and simple card interpretations',
   },
   {
     id: 'gpt-4o',
-    label: 'GPT 4o',
+    label: 'Deep',
     apiIdentifier: 'gpt-4o',
-    description: 'For complex, multi-step tasks',
+    description: 'Deep tarot analysis with Lacanian psychological insights',
   },
 ] as const;
 
-export const DEFAULT_MODEL_NAME: string = 'gpt-4o-mini';
+export const DEFAULT_MODEL_NAME: string = 'gpt-4o';

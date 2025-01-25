@@ -16,24 +16,24 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'What are the advantages',
-      label: 'of using Next.js?',
-      action: 'What are the advantages of using Next.js?',
+      title: 'Draw a card',
+      label: 'for daily guidance',
+      action: 'Can you draw a single card for my daily guidance?',
     },
     {
-      title: 'Write code that',
-      label: `demonstrates djikstra's algorithm`,
-      action: `Write code that demonstrates djikstra's algorithm`,
+      title: 'Celtic Cross',
+      label: 'for deep insight',
+      action: 'I would like a Celtic Cross spread reading',
     },
     {
-      title: 'Help me write an essay',
-      label: `about silicon valley`,
-      action: `Help me write an essay about silicon valley`,
+      title: 'Three Card',
+      label: 'past, present, future',
+      action: 'Can I have a three card spread for past, present, and future?',
     },
     {
-      title: 'What is the weather',
-      label: 'in San Francisco?',
-      action: 'What is the weather in San Francisco?',
+      title: 'Career Reading',
+      label: 'with career focus',
+      action: 'I need a career-focused tarot reading',
     },
   ];
 
