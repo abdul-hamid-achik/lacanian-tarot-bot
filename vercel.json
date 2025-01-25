@@ -16,6 +16,5 @@
         "deploymentEnabled": {
             "main": true
         }
-    },
-    "checks": false
+    }
 }
