@@ -1,21 +1,31 @@
-import { config } from 'dotenv';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
+import { config } from 'dotenv';
 
-config({
-  path: '.env.local',
-});
+// Load .env.local only in development
+if (process.env.NODE_ENV !== 'production') {
+  config({ path: '.env.local' });
+}
 
 const runMigrate = async () => {
   if (!process.env.POSTGRES_URL) {
     throw new Error('POSTGRES_URL is not defined');
   }
 
-  const connection = postgres(process.env.POSTGRES_URL, { max: 1 });
-  const db = drizzle(connection);
+  const sql = postgres(process.env.POSTGRES_URL, { max: 1 });
+  const db = drizzle(sql);
 
   console.log('⏳ Running migrations...');
+
+  // Create vector extension if it doesn't exist
+  try {
+    await sql`CREATE EXTENSION IF NOT EXISTS vector;`;
+    console.log('✅ Vector extension check completed');
+  } catch (err) {
+    console.error('Failed to create vector extension:', err);
+    process.exit(1);
+  }
 
   const start = Date.now();
   await migrate(db, { migrationsFolder: './lib/db/migrations' });
