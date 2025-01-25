@@ -1,8 +1,8 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { TarotCard, tarotCard } from '../schema';
+import type postgres from 'postgres';
 import cardsData from './cards.json';
 
-export async function seedTarotCards(db: ReturnType<typeof drizzle>) {
+export async function seedTarotCards(client: postgres.Sql<{}>) {
+    const now = new Date();
     const cards = cardsData.cards.map(card => ({
         name: card.name,
         arcana: card.arcana,
@@ -10,13 +10,14 @@ export async function seedTarotCards(db: ReturnType<typeof drizzle>) {
         description: card.description,
         rank: card.rank,
         symbols: card.symbols,
-        // Generate image URL based on card name/type
-        imageUrl: generateImageUrl(card),
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        image_url: generateImageUrl(card),
+        created_at: now,
+        updated_at: now,
     }));
 
-    await db.insert(tarotCard).values(cards as unknown as TarotCard[]);
+    await client`
+        INSERT INTO "tarot_card" ${client(cards)}
+    `;
 }
 
 function generateImageUrl(card: typeof cardsData.cards[0]): string {

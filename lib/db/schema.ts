@@ -17,7 +17,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { db } from './client';
 
-export const user = pgTable('User', {
+export const user = pgTable('user', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
   email: varchar('email', { length: 64 }).notNull(),
   password: varchar('password', { length: 64 }),
@@ -25,11 +25,11 @@ export const user = pgTable('User', {
 
 export type User = InferSelectModel<typeof user>;
 
-export const chat = pgTable('Chat', {
+export const chat = pgTable('chat', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp('createdAt').notNull(),
+  createdAt: timestamp('created_at').notNull(),
   title: text('title').notNull(),
-  userId: uuid('userId')
+  userId: uuid('user_id')
     .notNull()
     .references(() => user.id),
   visibility: varchar('visibility', { enum: ['public', 'private'] })
@@ -39,29 +39,29 @@ export const chat = pgTable('Chat', {
 
 export type Chat = InferSelectModel<typeof chat>;
 
-export const message = pgTable('Message', {
+export const message = pgTable('message', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
-  chatId: uuid('chatId')
+  chatId: uuid('chat_id')
     .notNull()
     .references(() => chat.id),
   role: varchar('role').notNull(),
   content: json('content').notNull(),
-  createdAt: timestamp('createdAt').notNull(),
+  createdAt: timestamp('created_at').notNull(),
 });
 
 export type Message = InferSelectModel<typeof message>;
 
 export const vote = pgTable(
-  'Vote',
+  'vote',
   {
-    chatId: uuid('chatId')
+    chatId: uuid('chat_id')
       .notNull()
       .references(() => chat.id),
-    messageId: uuid('messageId')
+    messageId: uuid('message_id')
       .notNull()
       .references(() => message.id),
-    isUpvoted: boolean('isUpvoted').notNull(),
-    userId: uuid('userId')
+    isUpvoted: boolean('is_upvoted').notNull(),
+    userId: uuid('user_id')
       .notNull()
       .references(() => user.id),
   },
@@ -75,16 +75,16 @@ export const vote = pgTable(
 export type Vote = InferSelectModel<typeof vote>;
 
 export const document = pgTable(
-  'Document',
+  'document',
   {
     id: uuid('id').notNull().defaultRandom(),
-    createdAt: timestamp('createdAt').notNull(),
+    createdAt: timestamp('created_at').notNull(),
     title: text('title').notNull(),
     content: text('content'),
-    kind: varchar('text', { enum: ['text', 'code'] })
+    kind: varchar('kind', { enum: ['text', 'code'] })
       .notNull()
       .default('text'),
-    userId: uuid('userId')
+    userId: uuid('user_id')
       .notNull()
       .references(() => user.id),
   },
@@ -98,19 +98,19 @@ export const document = pgTable(
 export type Document = InferSelectModel<typeof document>;
 
 export const suggestion = pgTable(
-  'Suggestion',
+  'suggestion',
   {
     id: uuid('id').notNull().defaultRandom(),
-    documentId: uuid('documentId').notNull(),
-    documentCreatedAt: timestamp('documentCreatedAt').notNull(),
-    originalText: text('originalText').notNull(),
-    suggestedText: text('suggestedText').notNull(),
+    documentId: uuid('document_id').notNull(),
+    documentCreatedAt: timestamp('document_created_at').notNull(),
+    originalText: text('original_text').notNull(),
+    suggestedText: text('suggested_text').notNull(),
     description: text('description'),
-    isResolved: boolean('isResolved').notNull().default(false),
-    userId: uuid('userId')
+    isResolved: boolean('is_resolved').notNull().default(false),
+    userId: uuid('user_id')
       .notNull()
       .references(() => user.id),
-    createdAt: timestamp('createdAt').notNull(),
+    createdAt: timestamp('created_at').notNull(),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.id] }),
@@ -123,7 +123,7 @@ export const suggestion = pgTable(
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
 
-export const tarotCard = pgTable('TarotCard', {
+export const tarotCard = pgTable('tarot_card', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
   name: text('name').notNull(),
   arcana: varchar('arcana', { enum: ['Major', 'Minor'] }).notNull(),
@@ -131,64 +131,55 @@ export const tarotCard = pgTable('TarotCard', {
     enum: ['none', 'Wands', 'Cups', 'Swords', 'Pentacles']
   }).notNull(),
   description: text('description').notNull(),
-  rank: varchar('rank', { length: 8 }).notNull(), // To accommodate "Knight", "Queen", etc
+  rank: varchar('rank', { length: 8 }).notNull(),
   symbols: text('symbols').notNull(),
-  // For the image field, we'll store the filename
-  imageUrl: text('imageUrl'),
-  createdAt: timestamp('createdAt').notNull().defaultNow(),
-  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  imageUrl: text('image_url'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 export type TarotCard = InferSelectModel<typeof tarotCard>;
 
-// Optional: If you want to track card readings
-export const cardReading = pgTable('CardReading', {
+export const cardReading = pgTable('card_reading', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
-  userId: uuid('userId')
+  userId: uuid('user_id')
     .notNull()
     .references(() => user.id),
-  cardId: uuid('cardId')
+  cardId: uuid('card_id')
     .notNull()
     .references(() => tarotCard.id),
-  position: integer('position').notNull(), // Position in the spread
-  isReversed: boolean('isReversed').notNull().default(false),
+  position: integer('position').notNull(),
+  isReversed: boolean('is_reversed').notNull().default(false),
   notes: text('notes'),
-  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
 export type CardReading = InferSelectModel<typeof cardReading>;
 
-
-// Add to your schema.ts:
-
-// --- Themes & Relationships ---
-export const theme = pgTable('Theme', {
+export const theme = pgTable('theme', {
   id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 64 }).notNull().unique(), // "love", "career"
-  embedding: vector('embedding', { dimensions: 384 }), // pgvector for similarity search
+  name: varchar('name', { length: 64 }).notNull().unique(),
+  embedding: vector('embedding', { dimensions: 384 }),
 });
 
-// Link users to themes (dynamic weights)
-export const userTheme = pgTable('UserTheme', {
-  userId: uuid('userId').references(() => user.id),
-  themeId: uuid('themeId').references(() => theme.id),
+export const userTheme = pgTable('user_theme', {
+  userId: uuid('user_id').references(() => user.id),
+  themeId: uuid('theme_id').references(() => theme.id),
   weight: numeric('weight', { precision: 3, scale: 2 }).default('0.5'),
-  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Predefined card-theme relationships (from your JSON symbols/descriptions)
-export const cardTheme = pgTable('CardTheme', {
-  cardId: uuid('cardId').references(() => tarotCard.id),
-  themeId: uuid('themeId').references(() => theme.id),
+export const cardTheme = pgTable('card_theme', {
+  cardId: uuid('card_id').references(() => tarotCard.id),
+  themeId: uuid('theme_id').references(() => theme.id),
   relevance: numeric('relevance', { precision: 3, scale: 2 }).default('0.5'),
 });
-
 
 export type Theme = InferSelectModel<typeof theme>;
 export type UserTheme = InferSelectModel<typeof userTheme>;
 export type CardTheme = InferSelectModel<typeof cardTheme>;
 
-export const spread = pgTable('Spread', {
+export const spread = pgTable('spread', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   description: text('description').notNull(),
@@ -198,22 +189,22 @@ export const spread = pgTable('Spread', {
     themeMultiplier: number;
     position: number;
   }>>().notNull(),
-  createdAt: timestamp('createdAt').notNull().defaultNow(),
-  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
-  userId: uuid('userId').references(() => user.id),
-  isPublic: boolean('isPublic').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  userId: uuid('user_id').references(() => user.id),
+  isPublic: boolean('is_public').notNull().default(false),
 });
 
 export type Spread = typeof spread.$inferSelect;
 export type NewSpread = typeof spread.$inferInsert;
 
-export const messageTheme = pgTable('MessageTheme', {
-  messageId: uuid('messageId').notNull(),
-  themeId: uuid('themeId').references(() => theme.id).notNull(),
-  userId: uuid('userId').references(() => user.id).notNull(),
+export const messageTheme = pgTable('message_theme', {
+  messageId: uuid('message_id').notNull(),
+  themeId: uuid('theme_id').references(() => theme.id).notNull(),
+  userId: uuid('user_id').references(() => user.id).notNull(),
   relevance: numeric('relevance', { precision: 3, scale: 2 }).default('0.5').notNull(),
-  createdAt: timestamp('createdAt').notNull().defaultNow(),
-  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.messageId, table.themeId] })
 }));

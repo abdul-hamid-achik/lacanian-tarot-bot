@@ -1,27 +1,58 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Client } from 'pg';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { tarotCard, spread } from '../schema';
 import { seedTarotCards } from './seed-cards';
 import { seedSpreads } from './seed-spreads';
+import { sql } from 'drizzle-orm';
+import { config } from 'dotenv';
+// Load .env.local only in development
+if (process.env.NODE_ENV !== 'production') {
+    config({ path: '.env.local' });
+}
 
 const runSeed = async () => {
     if (!process.env.POSTGRES_URL) {
         throw new Error('POSTGRES_URL is not defined');
     }
 
-    const client = new Client(process.env.POSTGRES_URL);
-    await client.connect();
-    const db = drizzle(client);
-
     console.log('⏳ Seeding database...');
     const start = Date.now();
 
-    await seedTarotCards(db);
-    await seedSpreads(db);
+    // Create a new postgres client
+    const client = postgres(process.env.POSTGRES_URL);
 
-    const end = Date.now();
-    console.log('✅ Seeding completed in', end - start, 'ms');
+    try {
+        // Check if we need to run seeds
+        const cardsCount = Number((await client`SELECT COUNT(*) FROM "tarot_card"`)[0].count);
+        const spreadsCount = Number((await client`SELECT COUNT(*) FROM "spread"`)[0].count);
 
-    await client.end();
+        let seeded = false;
+
+        if (cardsCount === 0) {
+            console.log('⏳ Seeding tarot cards...');
+            await seedTarotCards(client);
+            console.log('✅ Tarot cards seeded');
+            seeded = true;
+        }
+
+        if (spreadsCount === 0) {
+            console.log('⏳ Seeding spreads...');
+            await seedSpreads(client);
+            console.log('✅ Spreads seeded');
+            seeded = true;
+        }
+
+        const end = Date.now();
+        if (seeded) {
+            console.log('✅ Seeding completed in', end - start, 'ms');
+        } else {
+            console.log('ℹ️ No seeding required - tables already have data');
+        }
+    } finally {
+        // Always close the client
+        await client.end();
+    }
+
     process.exit(0);
 };
 

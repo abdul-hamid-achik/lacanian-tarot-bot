@@ -1,13 +1,15 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { spread } from '../schema';
+import type postgres from 'postgres';
 import { spreads } from './spreads.json';
 
-export async function seedSpreads(db: ReturnType<typeof drizzle>) {
-    for (const spreadData of spreads) {
-        await db.insert(spread).values({
-            ...spreadData,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        });
-    }
+export async function seedSpreads(client: postgres.Sql<{}>) {
+    const now = new Date();
+    const spreadRecords = spreads.map(spreadData => ({
+        ...spreadData,
+        created_at: now,
+        updated_at: now,
+    }));
+
+    await client`
+        INSERT INTO "spread" ${client(spreadRecords)}
+    `;
 }

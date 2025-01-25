@@ -7,23 +7,23 @@
                 {
                     "name": "First Position",
                     "description": "Past / Situation - What led to the current situation",
-                    "themeMultiplier": 1,
+                    "theme_multiplier": 1,
                     "position": 0
                 },
                 {
                     "name": "Second Position",
                     "description": "Present / Action - What is currently happening or what action to take",
-                    "themeMultiplier": 1,
+                    "theme_multiplier": 1,
                     "position": 1
                 },
                 {
                     "name": "Third Position",
                     "description": "Future / Outcome - Potential outcome or future developments",
-                    "themeMultiplier": 1,
+                    "theme_multiplier": 1,
                     "position": 2
                 }
             ],
-            "isPublic": true
+            "is_public": true
         },
         {
             "name": "Celtic Cross",
@@ -32,65 +32,65 @@
                 {
                     "name": "The Present",
                     "description": "The current situation or question at hand",
-                    "themeMultiplier": 1.5,
+                    "theme_multiplier": 1.5,
                     "position": 0
                 },
                 {
                     "name": "The Challenge",
                     "description": "What crosses or challenges the situation",
-                    "themeMultiplier": 1.2,
+                    "theme_multiplier": 1.2,
                     "position": 1
                 },
                 {
                     "name": "The Foundation",
                     "description": "The basis of the situation, what lies beneath",
-                    "themeMultiplier": 1,
+                    "theme_multiplier": 1,
                     "position": 2
                 },
                 {
                     "name": "The Past",
                     "description": "Recent past influences that are fading",
-                    "themeMultiplier": 0.8,
+                    "theme_multiplier": 0.8,
                     "position": 3
                 },
                 {
                     "name": "The Crown",
                     "description": "Possible outcome, what could happen",
-                    "themeMultiplier": 1.2,
+                    "theme_multiplier": 1.2,
                     "position": 4
                 },
                 {
                     "name": "The Future",
                     "description": "Near future influences approaching",
-                    "themeMultiplier": 1.2,
+                    "theme_multiplier": 1.2,
                     "position": 5
                 },
                 {
                     "name": "The Self",
                     "description": "Your attitude and approach to the situation",
-                    "themeMultiplier": 1,
+                    "theme_multiplier": 1,
                     "position": 6
                 },
                 {
                     "name": "External Influences",
                     "description": "How others see you or influence the situation",
-                    "themeMultiplier": 0.8,
+                    "theme_multiplier": 0.8,
                     "position": 7
                 },
                 {
                     "name": "Hopes and Fears",
                     "description": "Your inner emotions and expectations",
-                    "themeMultiplier": 1,
+                    "theme_multiplier": 1,
                     "position": 8
                 },
                 {
                     "name": "Final Outcome",
                     "description": "The ultimate resolution or final outcome",
-                    "themeMultiplier": 1.5,
+                    "theme_multiplier": 1.5,
                     "position": 9
                 }
             ],
-            "isPublic": true
+            "is_public": true
         },
         {
             "name": "Relationship Spread",
@@ -99,35 +99,35 @@
                 {
                     "name": "Self",
                     "description": "Your role and feelings in the relationship",
-                    "themeMultiplier": 1.2,
+                    "theme_multiplier": 1.2,
                     "position": 0
                 },
                 {
                     "name": "Partner",
                     "description": "Your partner's role and feelings",
-                    "themeMultiplier": 1.2,
+                    "theme_multiplier": 1.2,
                     "position": 1
                 },
                 {
                     "name": "Connection",
                     "description": "The nature of your connection",
-                    "themeMultiplier": 1.5,
+                    "theme_multiplier": 1.5,
                     "position": 2
                 },
                 {
                     "name": "Challenges",
                     "description": "Current or potential obstacles",
-                    "themeMultiplier": 1,
+                    "theme_multiplier": 1,
                     "position": 3
                 },
                 {
                     "name": "Outcome",
                     "description": "Where the relationship is heading",
-                    "themeMultiplier": 1.2,
+                    "theme_multiplier": 1.2,
                     "position": 4
                 }
             ],
-            "isPublic": true
+            "is_public": true
         }
     ]
 }

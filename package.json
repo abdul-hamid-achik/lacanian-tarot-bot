@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbo",
-    "build": "tsx lib/db/migrate && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint && biome lint --write --unsafe",
     "lint:fix": "next lint --fix && biome lint --write --unsafe",
@@ -15,7 +15,10 @@
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",
     "db:check": "drizzle-kit check",
-    "db:up": "drizzle-kit up"
+    "db:up": "drizzle-kit up",
+    "db:seed": "tsx lib/db/seeds/index.ts",
+    "postinstall": "tsx lib/db/migrate.ts",
+    "db:deploy": "tsx lib/db/migrate.ts && tsx lib/db/seeds/index.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "1.0.6",
