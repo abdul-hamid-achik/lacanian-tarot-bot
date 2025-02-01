@@ -30,15 +30,18 @@ export const authConfig: NextAuthConfig = {
     signIn: '/login'
   },
   providers: [
-    ...devProvider,
-    GitHub({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!
-    }),
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!
-    })
+    ...(process.env.NODE_ENV === 'development'
+      ? devProvider
+      : [
+        GitHub({
+          clientId: process.env.GITHUB_ID!,
+          clientSecret: process.env.GITHUB_SECRET!
+        }),
+        Google({
+          clientId: process.env.GOOGLE_CLIENT_ID!,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET!
+        })
+      ]),
   ],
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
@@ -50,7 +53,7 @@ export const authConfig: NextAuthConfig = {
         if (isLoggedIn) return true;
         return false;
       } else if (isLoggedIn) {
-        return Response.redirect(nextUrl.origin + '/chat');
+        return Response.redirect(`${nextUrl.origin}/chat`);
       }
       return true;
     },

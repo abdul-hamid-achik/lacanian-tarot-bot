@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TarotCard, Spread } from '@/lib/db/schema';
+import type { TarotCard, Spread } from '@/lib/db/schema';
 import { cn } from '@/lib/utils';
 
 interface SpreadPosition {

@@ -1,4 +1,4 @@
-import { type Theme, type UserTheme } from './db/schema';
+import type { Theme, UserTheme } from './db/schema';
 
 export interface ThemeCombo {
     themes: string[];

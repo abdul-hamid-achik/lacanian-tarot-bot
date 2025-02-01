@@ -35,7 +35,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               className="flex flex-row gap-3 items-center"
             >
               <span className="text-lg font-semibold px-2 hover:bg-muted rounded-md cursor-pointer">
-                Chatbot
+                Past Revelations
               </span>
             </Link>
             <Tooltip>
@@ -53,13 +53,19 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                   <PlusIcon />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent align="end">New Chat</TooltipContent>
+              <TooltipContent align="end">New Reading</TooltipContent>
             </Tooltip>
           </div>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarHistory user={user} />
+        {user ? (
+          <SidebarHistory user={user} />
+        ) : (
+          <div className="flex flex-col gap-4 p-4 text-center text-muted-foreground">
+            <p className="italic">The cards await your presence...</p>
+          </div>
+        )}
       </SidebarContent>
       <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
     </Sidebar>

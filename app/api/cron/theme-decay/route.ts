@@ -2,6 +2,8 @@ import { PersonaManager } from '@/lib/theme-manager';
 import { db } from '@/lib/db/client';
 import { user } from '@/lib/db/schema';
 import { NextResponse } from 'next/server';
+import { StatusCodes } from 'http-status-codes';
+import { createTarotError } from '@/lib/errors';
 
 // This endpoint should be protected with a cron job secret
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -10,8 +12,11 @@ export async function POST(request: Request) {
     try {
         // Verify the request is from our cron job
         const authHeader = request.headers.get('authorization');
-        if (authHeader !== `Bearer ${CRON_SECRET}`) {
-            return new NextResponse('Unauthorized', { status: 401 });
+        if (!CRON_SECRET || !authHeader || authHeader !== `Bearer ${CRON_SECRET}`) {
+            return NextResponse.json(
+                createTarotError(StatusCodes.UNAUTHORIZED, "The cosmic timekeeper denies your request"),
+                { status: StatusCodes.UNAUTHORIZED }
+            );
         }
 
         const personaManager = new PersonaManager();
@@ -32,6 +37,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
             success: true,
+            message: "The cosmic energies have been rebalanced",
             processed,
             errors,
             timestamp: new Date().toISOString()
@@ -39,13 +45,16 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('Theme decay job failed:', error);
         return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
+            createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The celestial balance could not be maintained"),
+            { status: StatusCodes.INTERNAL_SERVER_ERROR }
         );
     }
 }
 
 // Only allow POST requests
 export async function GET() {
-    return new NextResponse('Method not allowed', { status: 405 });
+    return NextResponse.json(
+        createTarotError(StatusCodes.METHOD_NOT_ALLOWED, "The cosmic timekeeper only accepts offerings through sacred rituals"),
+        { status: StatusCodes.METHOD_NOT_ALLOWED }
+    );
 }

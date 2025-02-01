@@ -1,16 +1,14 @@
 'use server';
 
-import { type CoreUserMessage, generateText } from 'ai';
+import type { CoreUserMessage, } from 'ai';
 import { cookies } from 'next/headers';
 import OpenAI from 'openai';
-
-import { customModel } from '@/lib/ai';
 import {
   deleteMessagesByChatIdAfterTimestamp,
   getMessageById,
   updateChatVisiblityById,
 } from '@/lib/db/queries';
-import { VisibilityType } from '@/components/visibility-selector';
+import type { VisibilityType } from '@/components/visibility-selector';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,

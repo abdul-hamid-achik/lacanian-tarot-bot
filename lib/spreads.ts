@@ -1,7 +1,7 @@
 import { db } from './db/client';
 import { spread as spreadTable } from './db/schema';
 import { eq } from 'drizzle-orm';
-import { PersonalizedCardSelector } from './card-selector';
+import type { PersonalizedCardSelector } from './card-selector';
 import type { UserPersona } from './persona';
 import type { TarotCard } from './db/schema';
 import type { InferSelectModel } from 'drizzle-orm';

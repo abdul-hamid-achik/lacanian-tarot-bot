@@ -1,23 +1,23 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
-import { PersonaManager } from '@/lib/persona';
+import { PersonaManager, } from '@/lib/persona';
 import { PersonalizedCardSelector } from '@/lib/card-selector';
 import { createDataStreamResponse } from '@/lib/streaming';
 import { streamText } from '@/lib/ai/stream';
 import { db } from '@/lib/db/client';
-import { cardReading, type Spread } from '@/lib/db/schema';
+import { cardReading, type Spread, } from '@/lib/db/schema';
 import { customModel } from '@/lib/ai';
 import {
   deleteChatById,
   getChatById,
   saveChat,
-  saveMessages,
 } from '@/lib/db/queries';
-import { generateUUID, getMostRecentUserMessage, sanitizeResponseMessages } from '@/lib/utils';
 import { generateTitleFromUserMessage } from '../../actions';
 import { sql } from 'drizzle-orm';
 import { drawPersonalizedCards } from '@/lib/cards';
-import { getPublicSpreads, getSpreadById } from '@/lib/spreads';
+import { getSpreadById } from '@/lib/spreads';
+import { StatusCodes } from 'http-status-codes';
+import { createTarotError } from '@/lib/errors';
 
 const personaManager = new PersonaManager();
 const cardSelector = new PersonalizedCardSelector();
@@ -64,7 +64,7 @@ function detectTarotIntent(message: string): {
 function parseTarotRequest(message: string): { numCards: number } {
   const numCardsMatch = message.match(/(\d+)\s+cards?/);
   return {
-    numCards: numCardsMatch ? parseInt(numCardsMatch[1], 10) : 3,
+    numCards: numCardsMatch ? Number.parseInt(numCardsMatch[1], 10) : 3,
   };
 }
 
@@ -74,17 +74,35 @@ interface ChatMessage {
   name: string;
 }
 
+export async function GET(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      createTarotError(StatusCodes.UNAUTHORIZED),
+      { status: StatusCodes.UNAUTHORIZED }
+    );
+  }
+
+  const chats = await getChatsByUserId({ id: session.user.id });
+  return NextResponse.json(chats);
+}
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
+      createTarotError(StatusCodes.UNAUTHORIZED),
+      { status: StatusCodes.UNAUTHORIZED }
     );
   }
 
   const { messages, id: chatId }: { messages: ChatMessage[]; id: string } = await request.json();
   const latestMessage = messages[messages.length - 1].content;
+  const existingChat = await getChatById({ id: chatId });
+  if (!existingChat) {
+    const title = generateTitleFromUserMessage(latestMessage);
+    await saveChat({ id: chatId, userId: session.user.id, title });
+  }
 
   // Detect tarot intent
   const intent = detectTarotIntent(latestMessage);
@@ -99,8 +117,8 @@ export async function POST(request: Request) {
       const spread = await getSpreadById(intent.spreadId);
       if (!spread) {
         return NextResponse.json(
-          { error: 'Spread not found' },
-          { status: 404 }
+          createTarotError(StatusCodes.NOT_FOUND, "The spread you seek eludes the cards' vision"),
+          { status: StatusCodes.NOT_FOUND }
         );
       }
       spreadInfo = spread as SpreadWithPositions;
@@ -165,7 +183,10 @@ ${spreadInfo.positions.map((pos: SpreadPosition, i: number) => `${i + 1}. ${pos.
 export async function PATCH(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
-    return new NextResponse('Unauthorized', { status: 401 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.UNAUTHORIZED),
+      { status: StatusCodes.UNAUTHORIZED }
+    );
   }
 
   const { chatId, messageId, type } = await request.json();
@@ -185,30 +206,43 @@ export async function DELETE(request: Request) {
   const id = searchParams.get('id');
 
   if (!id) {
-    return new Response('Not Found', { status: 404 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.BAD_REQUEST, "The cards cannot find what you seek to remove"),
+      { status: StatusCodes.BAD_REQUEST }
+    );
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.UNAUTHORIZED),
+      { status: StatusCodes.UNAUTHORIZED }
+    );
   }
 
   try {
     const chat = await getChatById({ id });
     if (!chat) {
-      return new Response('Not Found', { status: 404 });
+      return NextResponse.json(
+        createTarotError(StatusCodes.NOT_FOUND),
+        { status: StatusCodes.NOT_FOUND }
+      );
     }
 
     if (chat.userId !== session.user.id) {
-      return new Response('Unauthorized', { status: 401 });
+      return NextResponse.json(
+        createTarotError(StatusCodes.FORBIDDEN),
+        { status: StatusCodes.FORBIDDEN }
+      );
     }
 
     await deleteChatById({ id });
-    return new Response('Chat deleted', { status: 200 });
+    return NextResponse.json({ message: "The cards have faded into the mists of time" });
   } catch (error) {
     console.error('Error deleting chat:', error);
-    return new Response('An error occurred while processing your request', {
-      status: 500,
-    });
+    return NextResponse.json(
+      createTarotError(StatusCodes.INTERNAL_SERVER_ERROR),
+      { status: StatusCodes.INTERNAL_SERVER_ERROR }
+    );
   }
 }

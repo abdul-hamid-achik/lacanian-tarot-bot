@@ -1,11 +1,8 @@
 'use client';
-
-import { useChat } from 'ai/react';
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { TarotCard } from '@/components/tarot/tarot-card';
 import { cn } from '@/lib/utils';
 import { SpreadSelector } from '../spread/SpreadSelector';
 import { SpreadDisplay } from '../spread/SpreadDisplay';
@@ -85,6 +82,7 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     messages: [...messages, userMessage],
+                    id: chatId,
                     userId,
                     spread: spread ? {
                         id: selectedSpread,

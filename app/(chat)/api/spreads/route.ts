@@ -6,7 +6,7 @@ import {
     createSpread,
     type CreateSpreadInput,
     validateSpreadPositions,
-    Spread,
+    type Spread,
 } from '@/lib/spreads';
 
 export async function GET() {

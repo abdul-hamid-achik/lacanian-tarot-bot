@@ -9,7 +9,7 @@ export const parseTarotRequest = (message: string) => {
     const spreadMatch = message.match(/spread:\s*(\w+)/);
 
     return {
-        numCards: numCardsMatch ? parseInt(numCardsMatch[1], 10) : 3,
+        numCards: numCardsMatch ? Number.parseInt(numCardsMatch[1], 10) : 3,
         spread: spreadMatch ? spreadMatch[1] : undefined
     };
 };

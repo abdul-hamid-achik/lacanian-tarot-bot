@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
 import { PersonaManager } from '@/lib/theme-manager';
 import { drawPersonalizedCards } from '@/lib/card-selector';
+import { StatusCodes } from 'http-status-codes';
+import { createTarotError } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
     try {
@@ -9,8 +11,8 @@ export async function POST(request: NextRequest) {
 
         if (!session?.user) {
             return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
+                createTarotError(StatusCodes.UNAUTHORIZED),
+                { status: StatusCodes.UNAUTHORIZED }
             );
         }
 
@@ -18,8 +20,8 @@ export async function POST(request: NextRequest) {
 
         if (typeof numCards !== 'number' || numCards < 1 || numCards > 10) {
             return NextResponse.json(
-                { error: 'Invalid number of cards requested' },
-                { status: 400 }
+                createTarotError(StatusCodes.BAD_REQUEST, "The cards whisper that your request exceeds the bounds of their wisdom"),
+                { status: StatusCodes.BAD_REQUEST }
             );
         }
 
@@ -34,8 +36,8 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         console.error('Failed to draw cards:', error);
         return NextResponse.json(
-            { error: 'Failed to draw cards' },
-            { status: 500 }
+            createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The cosmic energies are misaligned for this reading"),
+            { status: StatusCodes.INTERNAL_SERVER_ERROR }
         );
     }
 }

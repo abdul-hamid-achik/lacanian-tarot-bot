@@ -149,7 +149,7 @@ export class PersonalizedCardSelector {
             themeMultiplier: number;
             position: number;
         },
-        numCards: number = 10
+        numCards = 10
     ): Promise<TarotCard[]> {
         // Combine cards and deduplicate
         const cardMap = new Map<string, { card: TarotCard; score: number }>();

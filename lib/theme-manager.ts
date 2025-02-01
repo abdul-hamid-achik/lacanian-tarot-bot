@@ -1,6 +1,6 @@
 import { db } from './db/client';
-import { userTheme, theme, type UserTheme } from './db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { userTheme, } from './db/schema';
+import { eq, and, } from 'drizzle-orm';
 import { trackThemeChange } from './analytics';
 
 export class PersonaManager {

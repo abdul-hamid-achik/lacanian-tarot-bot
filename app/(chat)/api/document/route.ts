@@ -1,38 +1,52 @@
 import { auth } from '@/app/(auth)/auth';
-import { BlockKind } from '@/components/block';
+import type { BlockKind } from '@/components/block';
 import {
   deleteDocumentsByIdAfterTimestamp,
   getDocumentsById,
   saveDocument,
 } from '@/lib/db/queries';
+import { StatusCodes } from 'http-status-codes';
+import { createTarotError } from '@/lib/errors';
+import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 
   if (!id) {
-    return new Response('Missing id', { status: 400 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.BAD_REQUEST, "The cards cannot divine your request without proper guidance"),
+      { status: StatusCodes.BAD_REQUEST }
+    );
   }
 
   const session = await auth();
 
   if (!session || !session.user) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.UNAUTHORIZED),
+      { status: StatusCodes.UNAUTHORIZED }
+    );
   }
 
   const documents = await getDocumentsById({ id });
-
   const [document] = documents;
 
   if (!document) {
-    return new Response('Not Found', { status: 404 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.NOT_FOUND),
+      { status: StatusCodes.NOT_FOUND }
+    );
   }
 
   if (document.userId !== session.user.id) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.FORBIDDEN),
+      { status: StatusCodes.FORBIDDEN }
+    );
   }
 
-  return Response.json(documents, { status: 200 });
+  return NextResponse.json(documents);
 }
 
 export async function POST(request: Request) {
@@ -40,13 +54,19 @@ export async function POST(request: Request) {
   const id = searchParams.get('id');
 
   if (!id) {
-    return new Response('Missing id', { status: 400 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.BAD_REQUEST, "The mystical scroll requires an identifier"),
+      { status: StatusCodes.BAD_REQUEST }
+    );
   }
 
   const session = await auth();
 
   if (!session) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.UNAUTHORIZED),
+      { status: StatusCodes.UNAUTHORIZED }
+    );
   }
 
   const {
@@ -56,17 +76,28 @@ export async function POST(request: Request) {
   }: { content: string; title: string; kind: BlockKind } = await request.json();
 
   if (session.user?.id) {
-    const document = await saveDocument({
-      id,
-      content,
-      title,
-      kind,
-      userId: session.user.id,
-    });
+    try {
+      const document = await saveDocument({
+        id,
+        content,
+        title,
+        kind,
+        userId: session.user.id,
+      });
 
-    return Response.json(document, { status: 200 });
+      return NextResponse.json(document);
+    } catch (error) {
+      return NextResponse.json(
+        createTarotError(StatusCodes.INTERNAL_SERVER_ERROR),
+        { status: StatusCodes.INTERNAL_SERVER_ERROR }
+      );
+    }
   }
-  return new Response('Unauthorized', { status: 401 });
+
+  return NextResponse.json(
+    createTarotError(StatusCodes.UNAUTHORIZED),
+    { status: StatusCodes.UNAUTHORIZED }
+  );
 }
 
 export async function PATCH(request: Request) {

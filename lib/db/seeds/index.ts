@@ -1,9 +1,7 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
+
 import postgres from 'postgres';
-import { tarotCard, spread } from '../schema';
 import { seedTarotCards } from './seed-cards';
 import { seedSpreads } from './seed-spreads';
-import { sql } from 'drizzle-orm';
 import { config } from 'dotenv';
 // Load .env.local only in development
 if (process.env.NODE_ENV !== 'production') {

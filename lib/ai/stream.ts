@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { createParser, ParserCallbacks } from 'eventsource-parser';
+import { createParser, type ParserCallbacks } from 'eventsource-parser';
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY

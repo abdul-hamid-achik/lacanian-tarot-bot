@@ -1,6 +1,6 @@
-import { eq, desc, sql, and } from 'drizzle-orm';
+import { eq, sql, and } from 'drizzle-orm';
 import { db } from './db/client';
-import { user, userTheme, theme, chat, message, type Theme, type UserTheme } from './db/schema';
+import { userTheme, theme, } from './db/schema';
 import { TextEmbedder } from './embeddings';
 
 export interface UserPersona {
@@ -21,7 +21,7 @@ const daysSince = (date: Date) => {
 
 export class PersonaManager {
     private embeddingModel: TextEmbedder;
-    private decayRate = parseFloat(process.env.THEME_DECAY_RATE || '0.95');
+    private decayRate = Number.parseFloat(process.env.THEME_DECAY_RATE || '0.95');
 
     constructor(embeddingModel?: TextEmbedder) {
         this.embeddingModel = embeddingModel || new TextEmbedder();
