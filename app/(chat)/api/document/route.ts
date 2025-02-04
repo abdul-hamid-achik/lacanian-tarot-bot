@@ -107,27 +107,49 @@ export async function PATCH(request: Request) {
   const { timestamp }: { timestamp: string } = await request.json();
 
   if (!id) {
-    return new Response('Missing id', { status: 400 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.BAD_REQUEST, "The mystical scroll requires an identifier"),
+      { status: StatusCodes.BAD_REQUEST }
+    );
   }
 
   const session = await auth();
 
   if (!session || !session.user) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json(
+      createTarotError(StatusCodes.UNAUTHORIZED),
+      { status: StatusCodes.UNAUTHORIZED }
+    );
   }
 
-  const documents = await getDocumentsById({ id });
+  try {
+    const documents = await getDocumentsById({ id });
+    const [document] = documents;
 
-  const [document] = documents;
+    if (!document) {
+      return NextResponse.json(
+        createTarotError(StatusCodes.NOT_FOUND),
+        { status: StatusCodes.NOT_FOUND }
+      );
+    }
 
-  if (document.userId !== session.user.id) {
-    return new Response('Unauthorized', { status: 401 });
+    if (document.userId !== session.user.id) {
+      return NextResponse.json(
+        createTarotError(StatusCodes.FORBIDDEN),
+        { status: StatusCodes.FORBIDDEN }
+      );
+    }
+
+    await deleteDocumentsByIdAfterTimestamp({
+      id,
+      timestamp: new Date(timestamp),
+    });
+
+    return NextResponse.json({ message: "The sands of time have swept away the requested scrolls" });
+  } catch (error) {
+    return NextResponse.json(
+      createTarotError(StatusCodes.INTERNAL_SERVER_ERROR),
+      { status: StatusCodes.INTERNAL_SERVER_ERROR }
+    );
   }
-
-  await deleteDocumentsByIdAfterTimestamp({
-    id,
-    timestamp: new Date(timestamp),
-  });
-
-  return new Response('Deleted', { status: 200 });
 }

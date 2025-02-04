@@ -6,6 +6,8 @@ import {
     deleteSpread,
     validateSpreadPositions,
 } from '@/lib/spreads';
+import { StatusCodes } from 'http-status-codes';
+import { createTarotError } from '@/lib/errors';
 
 export async function GET(
     request: NextRequest,
@@ -17,18 +19,26 @@ export async function GET(
 
         if (!spread) {
             return NextResponse.json(
-                { error: 'Spread not found' },
-                { status: 404 }
+                createTarotError(StatusCodes.NOT_FOUND, "The spread pattern you seek has vanished into the ethereal mists"),
+                { status: StatusCodes.NOT_FOUND }
             );
         }
 
         // If spread is private, check authorization
         if (!spread.isPublic) {
-            const session = await auth();
-            if (!session?.user || session.user.id !== spread.userId) {
+            try {
+                const session = await auth();
+                if (!session?.user?.id || session.user.id !== spread.userId) {
+                    return NextResponse.json(
+                        createTarotError(StatusCodes.FORBIDDEN, "This sacred pattern is veiled from your sight"),
+                        { status: StatusCodes.FORBIDDEN }
+                    );
+                }
+            } catch (error) {
+                console.error('Authentication error:', error);
                 return NextResponse.json(
-                    { error: 'Unauthorized' },
-                    { status: 401 }
+                    createTarotError(StatusCodes.UNAUTHORIZED, "Your spiritual connection has been disrupted"),
+                    { status: StatusCodes.UNAUTHORIZED }
                 );
             }
         }
@@ -37,8 +47,8 @@ export async function GET(
     } catch (error) {
         console.error('Failed to fetch spread:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch spread' },
-            { status: 500 }
+            createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The cosmic forces could not reveal this spread"),
+            { status: StatusCodes.INTERNAL_SERVER_ERROR }
         );
     }
 }
@@ -47,32 +57,31 @@ export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await auth();
-
-    if (!session?.user) {
-        return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-        );
-    }
-
     try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return NextResponse.json(
+                createTarotError(StatusCodes.UNAUTHORIZED, "Only initiated seekers may modify spread patterns"),
+                { status: StatusCodes.UNAUTHORIZED }
+            );
+        }
+
         const { id } = await params;
         // Get existing spread
         const existingSpread = await getSpreadById(id);
 
         if (!existingSpread) {
             return NextResponse.json(
-                { error: 'Spread not found' },
-                { status: 404 }
+                createTarotError(StatusCodes.NOT_FOUND, "The spread pattern you seek to modify has vanished"),
+                { status: StatusCodes.NOT_FOUND }
             );
         }
 
         // Check ownership
         if (existingSpread.userId !== session.user.id) {
             return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
+                createTarotError(StatusCodes.FORBIDDEN, "You are not attuned to modify this sacred pattern"),
+                { status: StatusCodes.FORBIDDEN }
             );
         }
 
@@ -81,8 +90,8 @@ export async function PATCH(
         // Validate positions if they're being updated
         if (body.positions && !validateSpreadPositions(body.positions)) {
             return NextResponse.json(
-                { error: 'Invalid positions format' },
-                { status: 400 }
+                createTarotError(StatusCodes.BAD_REQUEST, "The positions in your spread do not align with the cosmic order"),
+                { status: StatusCodes.BAD_REQUEST }
             );
         }
 
@@ -91,17 +100,29 @@ export async function PATCH(
 
         if (!updatedSpread) {
             return NextResponse.json(
-                { error: 'Failed to update spread' },
-                { status: 500 }
+                createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The cosmic forces resist this transformation"),
+                { status: StatusCodes.INTERNAL_SERVER_ERROR }
             );
         }
 
-        return NextResponse.json(updatedSpread);
+        return NextResponse.json({
+            message: "The sacred pattern has been realigned",
+            spread: updatedSpread
+        });
     } catch (error) {
+        // Check if it's an auth error
+        if (error instanceof Error && error.message.includes('auth')) {
+            console.error('Authentication error:', error);
+            return NextResponse.json(
+                createTarotError(StatusCodes.UNAUTHORIZED, "Your spiritual connection has been disrupted"),
+                { status: StatusCodes.UNAUTHORIZED }
+            );
+        }
+
         console.error('Failed to update spread:', error);
         return NextResponse.json(
-            { error: 'Failed to update spread' },
-            { status: 500 }
+            createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The mystical energies could not complete this transformation"),
+            { status: StatusCodes.INTERNAL_SERVER_ERROR }
         );
     }
 }
@@ -110,32 +131,31 @@ export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const session = await auth();
-
-    if (!session?.user) {
-        return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-        );
-    }
-
     try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return NextResponse.json(
+                createTarotError(StatusCodes.UNAUTHORIZED, "Only initiated seekers may dissolve spread patterns"),
+                { status: StatusCodes.UNAUTHORIZED }
+            );
+        }
+
         const { id } = await params;
         // Get existing spread
         const existingSpread = await getSpreadById(id);
 
         if (!existingSpread) {
             return NextResponse.json(
-                { error: 'Spread not found' },
-                { status: 404 }
+                createTarotError(StatusCodes.NOT_FOUND, "The spread pattern you seek to dissolve has already faded"),
+                { status: StatusCodes.NOT_FOUND }
             );
         }
 
         // Check ownership
         if (existingSpread.userId !== session.user.id) {
             return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
+                createTarotError(StatusCodes.FORBIDDEN, "You are not attuned to dissolve this sacred pattern"),
+                { status: StatusCodes.FORBIDDEN }
             );
         }
 
@@ -144,17 +164,26 @@ export async function DELETE(
 
         if (!success) {
             return NextResponse.json(
-                { error: 'Failed to delete spread' },
-                { status: 500 }
+                createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The cosmic forces prevent this pattern's dissolution"),
+                { status: StatusCodes.INTERNAL_SERVER_ERROR }
             );
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ message: "The sacred pattern has returned to the cosmic void" });
     } catch (error) {
+        // Check if it's an auth error
+        if (error instanceof Error && error.message.includes('auth')) {
+            console.error('Authentication error:', error);
+            return NextResponse.json(
+                createTarotError(StatusCodes.UNAUTHORIZED, "Your spiritual connection has been disrupted"),
+                { status: StatusCodes.UNAUTHORIZED }
+            );
+        }
+
         console.error('Failed to delete spread:', error);
         return NextResponse.json(
-            { error: 'Failed to delete spread' },
-            { status: 500 }
+            createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The mystical energies could not complete this dissolution"),
+            { status: StatusCodes.INTERNAL_SERVER_ERROR }
         );
     }
 }

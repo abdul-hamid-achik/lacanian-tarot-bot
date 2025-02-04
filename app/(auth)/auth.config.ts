@@ -1,25 +1,8 @@
 import type { NextAuthConfig } from 'next-auth';
 import GitHub from 'next-auth/providers/github';
 import Google from 'next-auth/providers/google';
-import Credentials from 'next-auth/providers/credentials';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import { db } from '@/lib/db/client';
-
-const devProvider = process.env.NODE_ENV === 'development'
-  ? [
-    Credentials({
-      credentials: {},
-      async authorize() {
-        return {
-          id: "dev-user-000000",
-          name: "Development User",
-          email: "dev@local.host",
-          image: "https://avatar.vercel.sh/dev@local.host"
-        };
-      },
-    }),
-  ]
-  : [];
 
 export const authConfig: NextAuthConfig = {
   adapter: DrizzleAdapter(db),
@@ -30,9 +13,8 @@ export const authConfig: NextAuthConfig = {
     signIn: '/login'
   },
   providers: [
-    ...(process.env.NODE_ENV === 'development'
-      ? devProvider
-      : [
+    ...(process.env.NODE_ENV === 'production'
+      ? [
         GitHub({
           clientId: process.env.GITHUB_ID!,
           clientSecret: process.env.GITHUB_SECRET!
@@ -41,7 +23,8 @@ export const authConfig: NextAuthConfig = {
           clientId: process.env.GOOGLE_CLIENT_ID!,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET!
         })
-      ]),
+      ]
+      : []),
   ],
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {

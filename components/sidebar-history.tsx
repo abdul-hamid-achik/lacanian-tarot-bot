@@ -173,16 +173,16 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     });
 
     toast.promise(deletePromise, {
-      loading: 'Deleting chat...',
+      loading: 'The cosmic threads are being unwoven...',
       success: () => {
         mutate((history) => {
           if (history) {
             return history.filter((h) => h.id !== id);
           }
         });
-        return 'Chat deleted successfully';
+        return 'The cosmic threads have been unwoven';
       },
-      error: 'Failed to delete chat',
+      error: 'The cosmic threads could not be unwoven from this conversation',
     });
 
     setShowDeleteDialog(false);
@@ -238,7 +238,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <SidebarGroup>
         <SidebarGroupContent>
           <div className="px-2 text-zinc-500 w-full flex flex-row justify-center items-center text-sm gap-2">
-            Your conversations will appear here once you start chatting!
+            Your mystical readings will appear here as you unveil your spiritual journey
           </div>
         </SidebarGroupContent>
       </SidebarGroup>

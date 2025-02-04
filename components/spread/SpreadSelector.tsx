@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, fetcher } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
     Command,
@@ -16,7 +16,8 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { PREDEFINED_SPREADS } from '@/lib/spreads';
+import type { Spread } from '@/lib/spreads';
+import useSWR from 'swr';
 
 interface SpreadSelectorProps {
     onSpreadSelect: (spreadId: string) => void;
@@ -26,12 +27,31 @@ interface SpreadSelectorProps {
 export function SpreadSelector({ onSpreadSelect, className }: SpreadSelectorProps) {
     const [open, setOpen] = useState(false);
     const [selectedSpread, setSelectedSpread] = useState<string>('');
+    const { data, error } = useSWR<{ spreads: Spread[] }>('/api/spreads', fetcher);
 
     const handleSelect = (spreadId: string) => {
         setSelectedSpread(spreadId);
         setOpen(false);
         onSpreadSelect(spreadId);
     };
+
+    const selectedSpreadName = data?.spreads.find(s => s.id === selectedSpread)?.name;
+
+    if (error) {
+        return (
+            <Button variant="outline" disabled className={className}>
+                Failed to load spreads
+            </Button>
+        );
+    }
+
+    if (!data) {
+        return (
+            <Button variant="outline" disabled className={className}>
+                Loading spreads...
+            </Button>
+        );
+    }
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -42,9 +62,7 @@ export function SpreadSelector({ onSpreadSelect, className }: SpreadSelectorProp
                     aria-expanded={open}
                     className={cn('w-full justify-between', className)}
                 >
-                    {selectedSpread
-                        ? PREDEFINED_SPREADS[selectedSpread]?.name
-                        : 'Select a spread...'}
+                    {selectedSpreadName || 'Select a spread...'}
                     <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
@@ -53,16 +71,16 @@ export function SpreadSelector({ onSpreadSelect, className }: SpreadSelectorProp
                     <CommandInput placeholder="Search spreads..." />
                     <CommandEmpty>No spread found.</CommandEmpty>
                     <CommandGroup>
-                        {Object.entries(PREDEFINED_SPREADS).map(([id, spread]) => (
+                        {data.spreads.map((spread) => (
                             <CommandItem
-                                key={id}
-                                value={id}
-                                onSelect={() => handleSelect(id)}
+                                key={spread.id}
+                                value={spread.id}
+                                onSelect={() => handleSelect(spread.id)}
                             >
                                 <Check
                                     className={cn(
                                         'mr-2 h-4 w-4',
-                                        selectedSpread === id ? 'opacity-100' : 'opacity-0'
+                                        selectedSpread === spread.id ? 'opacity-100' : 'opacity-0'
                                     )}
                                 />
                                 <div className="flex flex-col">

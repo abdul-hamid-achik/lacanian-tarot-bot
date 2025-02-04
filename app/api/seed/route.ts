@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import postgres from 'postgres';
 import cardsData from '@/lib/db/seeds/cards.json';
 import spreadsData from '@/lib/db/seeds/spreads.json';
+import { StatusCodes } from 'http-status-codes';
+import { createTarotError } from '@/lib/errors';
 
 function generateImageUrl(card: any): string {
     if (card.arcana === 'Major') {
@@ -26,7 +28,10 @@ export async function POST(request: Request) {
     const SEED_TOKEN = process.env.SEED_SECRET;
 
     if (!SEED_TOKEN || !authHeader || authHeader !== `Bearer ${SEED_TOKEN}`) {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json(
+            createTarotError(StatusCodes.UNAUTHORIZED, "The mystical garden's gates remain closed to unauthorized cultivators"),
+            { status: StatusCodes.UNAUTHORIZED }
+        );
     }
 
     try {
@@ -39,7 +44,7 @@ export async function POST(request: Request) {
         let seeded = false;
 
         if (cardsCount === 0) {
-            console.log('⏳ Seeding tarot cards...');
+            console.log('⏳ Planting the seeds of arcane wisdom...');
             const now = new Date().toISOString();
             const cards = cardsData.cards.map(card => ({
                 name: card.name,
@@ -63,12 +68,12 @@ export async function POST(request: Request) {
                     symbols text, image_url text, created_at timestamptz, updated_at timestamptz
                 )
             `;
-            console.log('✅ Tarot cards seeded');
+            console.log('✅ The arcane wisdom has taken root');
             seeded = true;
         }
 
         if (spreadsCount === 0) {
-            console.log('⏳ Seeding spreads...');
+            console.log('⏳ Weaving the patterns of destiny...');
             const now = new Date().toISOString();
 
             for (const spreadData of spreadsData.spreads) {
@@ -94,19 +99,22 @@ export async function POST(request: Request) {
                     )
                 `;
             }
-            console.log('✅ Spreads seeded');
+            console.log('✅ The sacred patterns have been woven');
             seeded = true;
         }
 
         await sql.end();
 
         if (!seeded) {
-            return NextResponse.json({ message: 'Database already seeded' });
+            return NextResponse.json({ message: 'The mystical garden is already in full bloom' });
         }
 
-        return NextResponse.json({ message: 'Database seeded successfully' });
+        return NextResponse.json({ message: 'The seeds of wisdom have been planted and nurtured to life' });
     } catch (error) {
         console.error('Failed to seed database:', error);
-        return NextResponse.json({ error: 'Failed to seed database' }, { status: 500 });
+        return NextResponse.json(
+            createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The cosmic forces resist our attempts to plant these mystical seeds"),
+            { status: StatusCodes.INTERNAL_SERVER_ERROR }
+        );
     }
 }
