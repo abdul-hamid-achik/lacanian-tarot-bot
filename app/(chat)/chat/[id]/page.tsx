@@ -17,14 +17,11 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
     notFound();
   }
 
-  const session = await auth();
+  const session = await auth().catch(() => null);
 
-  if (chat.visibility === 'private') {
-    if (!session || !session.user) {
-      return notFound();
-    }
-
-    if (session.user.id !== chat.userId) {
+  // For private chats, require authentication and ownership
+  if (chat.visibility === 'private' && chat.userId) {
+    if (!session?.user || session.user.id !== chat.userId) {
       return notFound();
     }
   }

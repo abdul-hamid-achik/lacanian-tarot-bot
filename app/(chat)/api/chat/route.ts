@@ -19,6 +19,7 @@ import { drawPersonalizedCards } from '@/lib/cards';
 import { getSpreadById } from '@/lib/spreads';
 import { StatusCodes } from 'http-status-codes';
 import { createTarotError } from '@/lib/errors';
+import { cookies } from 'next/headers';
 
 const personaManager = new PersonaManager();
 const cardSelector = new PersonalizedCardSelector();
@@ -89,27 +90,33 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      createTarotError(StatusCodes.UNAUTHORIZED),
-      { status: StatusCodes.UNAUTHORIZED }
-    );
-  }
-
+  const session = await auth().catch(() => null);
   const { messages, id: chatId }: { messages: ChatMessage[]; id: string } = await request.json();
   const latestMessage = messages[messages.length - 1].content;
+
+  // Get or create chat
   const existingChat = await getChatById({ id: chatId });
   if (!existingChat) {
     const title = await generateTitleFromUserMessage({ 
       message: { role: 'user', content: latestMessage } 
     });
-    await saveChat({ id: chatId, userId: session.user.id, title });
+    await saveChat({ 
+      id: chatId, 
+      userId: session?.user?.id, // Optional userId for anonymous chats
+      title 
+    });
   }
 
   // Detect tarot intent
   const intent = detectTarotIntent(latestMessage);
-  const userPersona = await personaManager.getPersona(session.user.id);
+  
+  // Get cookie for anonymous session
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get('anonymous_session')?.value;
+
+  const userPersona = session?.user?.id 
+    ? await personaManager.getPersona(session.user.id)
+    : await personaManager.getPersona('anonymous', sessionId);
 
   if (intent.type !== 'none') {
     let selectedCards;

@@ -30,7 +30,6 @@ export const chat = pgTable('chat', {
   createdAt: timestamp('created_at').notNull(),
   title: text('title').notNull(),
   userId: uuid('user_id')
-    .notNull()
     .references(() => user.id),
   visibility: varchar('visibility', { enum: ['public', 'private'] })
     .notNull()
@@ -220,4 +219,43 @@ export async function getMessageThemes(messageId: string) {
     .from(messageTheme)
     .where(eq(messageTheme.messageId, messageId));
 }
+
+// Anonymous user session management
+export const anonymousUser = pgTable('anonymous_user', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  sessionId: text('session_id').notNull().unique(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  lastActive: timestamp('last_active').notNull().defaultNow(),
+});
+
+export type AnonymousUser = InferSelectModel<typeof anonymousUser>;
+
+export const anonymousUserTheme = pgTable('anonymous_user_theme', {
+  anonymousUserId: uuid('anonymous_user_id')
+    .references(() => anonymousUser.id)
+    .notNull(),
+  themeId: uuid('theme_id')
+    .references(() => theme.id)
+    .notNull(),
+  weight: numeric('weight', { precision: 3, scale: 2 }).default('0.5'),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.anonymousUserId, table.themeId] })
+}));
+
+// Anonymous votes
+export const anonymousVote = pgTable('anonymous_vote', {
+  chatId: uuid('chat_id')
+    .notNull()
+    .references(() => chat.id),
+  messageId: uuid('message_id')
+    .notNull()
+    .references(() => message.id),
+  isUpvoted: boolean('is_upvoted').notNull(),
+  anonymousUserId: uuid('anonymous_user_id')
+    .notNull()
+    .references(() => anonymousUser.id),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.chatId, table.messageId, table.anonymousUserId] })
+}));
 

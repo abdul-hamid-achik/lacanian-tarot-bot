@@ -2,6 +2,7 @@ import { eq, sql, and } from 'drizzle-orm';
 import { db } from './db/client';
 import { userTheme, theme, } from './db/schema';
 import { TextEmbedder } from './embeddings';
+import { getOrCreateAnonymousUser, getAnonymousUserThemes, updateAnonymousUserTheme } from './db/queries';
 
 export interface UserPersona {
     userId: string;
@@ -27,8 +28,38 @@ export class PersonaManager {
         this.embeddingModel = embeddingModel || new TextEmbedder();
     }
 
-    async getPersona(userId: string): Promise<UserPersona> {
-        // Get user's themes with weights
+    async getPersona(userId: string, sessionId?: string): Promise<UserPersona> {
+        if (sessionId) {
+            // Handle anonymous user
+            const anonymousUser = await getOrCreateAnonymousUser(sessionId);
+            const anonymousThemes = await getAnonymousUserThemes(anonymousUser.id);
+            
+            if (anonymousThemes.length === 0) {
+                return this.initializeAnonymousPersona(anonymousUser.id);
+            }
+
+            // Get theme names
+            const themeIds = anonymousThemes.map(t => t.themeId);
+            const themes = await db
+                .select({
+                    id: theme.id,
+                    name: theme.name,
+                })
+                .from(theme)
+                .where(sql`${theme.id} = ANY(${themeIds})`);
+
+            return {
+                userId: anonymousUser.id,
+                themes: themes.map(t => ({
+                    id: t.id,
+                    name: t.name,
+                    weight: Number(anonymousThemes.find(at => at.themeId === t.id)?.weight || 0.5),
+                })),
+                lastUpdated: anonymousUser.lastActive,
+            };
+        }
+
+        // Handle regular user
         const userThemes = await db
             .select({
                 id: theme.id,
@@ -39,17 +70,35 @@ export class PersonaManager {
             .innerJoin(theme, eq(theme.id, userTheme.themeId))
             .where(eq(userTheme.userId, userId));
 
-        // If no themes found, initialize with defaults
         if (userThemes.length === 0) {
             return this.initializePersona(userId);
         }
 
-        // Apply decay to weights based on last update
         const decayedThemes = await this.applyThemeDecay(userId, userThemes);
 
         return {
             userId,
             themes: decayedThemes,
+            lastUpdated: new Date(),
+        };
+    }
+
+    private async initializeAnonymousPersona(anonymousUserId: string): Promise<UserPersona> {
+        // Get all available themes
+        const themes = await db.select().from(theme);
+
+        // Initialize each theme with default weight
+        for (const t of themes) {
+            await updateAnonymousUserTheme(anonymousUserId, t.id, 0.5);
+        }
+
+        return {
+            userId: anonymousUserId,
+            themes: themes.map(t => ({
+                id: t.id,
+                name: t.name,
+                weight: 0.5,
+            })),
             lastUpdated: new Date(),
         };
     }

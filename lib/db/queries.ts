@@ -14,6 +14,9 @@ import {
   type Message,
   message,
   vote,
+  anonymousUser,
+  type AnonymousUser,
+  anonymousUserTheme,
 } from './schema';
 import { db } from './client';
 import { DatabaseErrors } from '../errors';
@@ -49,7 +52,7 @@ export async function saveChat({
   title,
 }: {
   id: string;
-  userId: string;
+  userId?: string;
   title: string;
 }) {
   try {
@@ -351,4 +354,81 @@ export async function upsertVote({
     messageId,
     isUpvoted: type === 'up',
   });
+}
+
+export async function getOrCreateAnonymousUser(sessionId: string): Promise<AnonymousUser> {
+  try {
+    // Try to find existing anonymous user
+    const existingUsers = await db
+      .select()
+      .from(anonymousUser)
+      .where(eq(anonymousUser.sessionId, sessionId));
+
+    if (existingUsers.length > 0) {
+      // Update last active timestamp
+      await db
+        .update(anonymousUser)
+        .set({ lastActive: new Date() })
+        .where(eq(anonymousUser.id, existingUsers[0].id));
+      return existingUsers[0];
+    }
+
+    // Create new anonymous user if not found
+    const [newUser] = await db
+      .insert(anonymousUser)
+      .values({
+        sessionId,
+        createdAt: new Date(),
+        lastActive: new Date(),
+      })
+      .returning();
+
+    return newUser;
+  } catch (error) {
+    console.error('Failed to get/create anonymous user:', error);
+    throw error;
+  }
+}
+
+export async function getAnonymousUserThemes(anonymousUserId: string) {
+  try {
+    return await db
+      .select({
+        themeId: anonymousUserTheme.themeId,
+        weight: anonymousUserTheme.weight,
+      })
+      .from(anonymousUserTheme)
+      .where(eq(anonymousUserTheme.anonymousUserId, anonymousUserId));
+  } catch (error) {
+    console.error('Failed to get anonymous user themes:', error);
+    throw error;
+  }
+}
+
+export async function updateAnonymousUserTheme(
+  anonymousUserId: string,
+  themeId: string,
+  weight: number
+) {
+  try {
+    const weightStr = weight.toFixed(2); // Convert to string with 2 decimal places
+    await db
+      .insert(anonymousUserTheme)
+      .values({
+        anonymousUserId,
+        themeId,
+        weight: weightStr,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [anonymousUserTheme.anonymousUserId, anonymousUserTheme.themeId],
+        set: {
+          weight: weightStr,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (error) {
+    console.error('Failed to update anonymous user theme:', error);
+    throw error;
+  }
 }

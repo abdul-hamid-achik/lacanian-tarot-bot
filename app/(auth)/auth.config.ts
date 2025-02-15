@@ -31,6 +31,11 @@ export const authConfig: NextAuthConfig = {
       const isLoggedIn = !!auth?.user;
       const isOnDashboard = nextUrl.pathname.startsWith('/chat');
       const isOnApi = nextUrl.pathname.startsWith('/api');
+      const isOnChatApi = nextUrl.pathname.startsWith('/api/chat');
+
+      if (isOnChatApi) {
+        return true;
+      }
 
       if (isOnDashboard || isOnApi) {
         if (isLoggedIn) return true;

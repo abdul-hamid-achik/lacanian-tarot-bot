@@ -9,28 +9,28 @@ import { authConfig } from '@/app/(auth)/auth.config';
 export default NextAuth(authConfig).auth;
 
 // Create a new ratelimiter that allows 10 requests per 15 seconds
-const ratelimit = new Ratelimit({
-  redis: kv,
-  limiter: Ratelimit.slidingWindow(10, '15s'),
-  analytics: true,
-});
+const ratelimit = process.env.NODE_ENV === 'production' 
+  ? new Ratelimit({
+      redis: kv,
+      limiter: Ratelimit.slidingWindow(10, '15s'),
+      analytics: true,
+    })
+  : null;
 
 export async function middleware(request: NextRequest) {
-  // Only rate limit API routes
-  if (request.nextUrl.pathname.startsWith('/api')) {
+  // Only rate limit API routes in production
+  if (process.env.NODE_ENV === 'production' && request.nextUrl.pathname.startsWith('/api')) {
     const forwardedFor = request.headers.get('x-forwarded-for');
     const ip = forwardedFor?.split(',')[0] ?? '127.0.0.1';
-    const { success, limit, reset, remaining } = await ratelimit.limit(
-      `ratelimit_${ip}`
-    );
+    const result = await ratelimit?.limit(`ratelimit_${ip}`);
 
-    if (!success) {
+    if (result && !result.success) {
       return new NextResponse('Too Many Requests', {
         status: 429,
         headers: {
-          'X-RateLimit-Limit': limit.toString(),
-          'X-RateLimit-Remaining': remaining.toString(),
-          'X-RateLimit-Reset': reset.toString(),
+          'X-RateLimit-Limit': result.limit.toString(),
+          'X-RateLimit-Remaining': result.remaining.toString(),
+          'X-RateLimit-Reset': result.reset.toString(),
         },
       });
     }

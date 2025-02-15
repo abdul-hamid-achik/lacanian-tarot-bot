@@ -11,7 +11,23 @@ export async function drawPersonalizedCards(
     numCards: number,
     userPersona: UserPersona
 ): Promise<DrawnCard[]> {
-    // Calculate theme-based weights
+    // For anonymous users or users with no themes, just draw random cards
+    if (userPersona.themes.length === 0) {
+        const cards = await db
+            .select({
+                card: tarotCard
+            })
+            .from(tarotCard)
+            .orderBy(sql`random()`)
+            .limit(numCards);
+
+        return cards.map(({ card }) => ({
+            ...card,
+            isReversed: Math.random() > 0.5
+        }));
+    }
+
+    // Calculate theme-based weights for authenticated users
     const themeWeights = userPersona.themes.reduce((acc, theme) => ({
         ...acc,
         [theme.id]: theme.weight
