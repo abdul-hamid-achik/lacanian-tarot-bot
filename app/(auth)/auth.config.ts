@@ -32,17 +32,34 @@ export const authConfig: NextAuthConfig = {
       const isOnDashboard = nextUrl.pathname.startsWith('/chat');
       const isOnApi = nextUrl.pathname.startsWith('/api');
       const isOnChatApi = nextUrl.pathname.startsWith('/api/chat');
+      const isOnVoteApi = nextUrl.pathname.startsWith('/api/vote');
 
-      if (isOnChatApi) {
+      // Allow anonymous access to chat and vote APIs
+      if (isOnChatApi || isOnVoteApi) {
         return true;
       }
 
-      if (isOnDashboard || isOnApi) {
+      // Protected routes that require authentication
+      const protectedRoutes = [
+        '/profile',
+        '/settings',
+        '/dashboard'
+      ];
+
+      const isProtectedRoute = protectedRoutes.some(route => 
+        nextUrl.pathname.startsWith(route)
+      );
+
+      if (isProtectedRoute) {
         if (isLoggedIn) return true;
         return false;
-      } else if (isLoggedIn) {
-        return Response.redirect(`${nextUrl.origin}/chat`);
       }
+
+      // Public routes
+      if (isOnDashboard || isOnApi) {
+        return true;
+      }
+
       return true;
     },
     async session({ session, token }) {

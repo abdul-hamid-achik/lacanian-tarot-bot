@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import { createParser, type ParserCallbacks } from 'eventsource-parser';
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
@@ -29,54 +28,52 @@ export async function streamText({
     });
 
     const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
-    const readableStream = new ReadableStream({
-        async start(controller) {
-            const onParse = (event: any) => {
-                if (event.type === 'event') {
-                    try {
-                        const data = JSON.parse(event.data);
-                        const text = data.choices[0]?.delta?.content || '';
-                        if (text) {
-                            controller.enqueue(encoder.encode(text));
-                        }
-                    } catch (e) {
-                        controller.error(e);
-                    }
-                }
-            };
-
-            const parser = createParser(onParse);
-
-            for await (const chunk of response) {
-                const text = chunk.choices[0]?.delta?.content;
-                if (text) {
-                    parser.feed(text);
-                }
-            }
-
-            controller.close();
-        },
-    });
 
     if (stream) {
         const writer = stream.getWriter();
-        const reader = readableStream.getReader();
-
         try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                await writer.write(value);
+            for await (const chunk of response) {
+                const text = chunk.choices[0]?.delta?.content;
+                if (text) {
+                    await writer.write(encoder.encode(text));
+                }
             }
-        } finally {
-            reader.releaseLock();
-            writer.releaseLock();
+            // Only close after all chunks are written
+            await writer.close();
+        } catch (error) {
+            console.error('Stream error:', error);
+            try {
+                await writer.close();
+            } catch (closeError) {
+                console.error('Error closing writer:', closeError);
+            }
+            throw error;
         }
-
         return null;
     }
 
-    return new Response(readableStream);
+    // For Response return, use TransformStream
+    const transformer = new TransformStream();
+    const writer = transformer.writable.getWriter();
+
+    // Process the stream and ensure it's properly written
+    try {
+        for await (const chunk of response) {
+            const text = chunk.choices[0]?.delta?.content;
+            if (text) {
+                await writer.write(encoder.encode(text));
+            }
+        }
+        // Only close after all chunks are written
+        await writer.close();
+    } catch (error) {
+        console.error('Stream processing error:', error);
+        try {
+            await writer.close();
+        } catch (closeError) {
+            console.error('Error closing writer:', closeError);
+        }
+    }
+
+    return new Response(transformer.readable);
 }

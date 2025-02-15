@@ -1,62 +1,34 @@
-
-import postgres from 'postgres';
+import { db } from '../client';
+import { user } from '../schema';
 import { seedTarotCards } from './seed-cards';
 import { seedSpreads } from './seed-spreads';
 import { config } from 'dotenv';
+
 // Load .env.local only in development
 if (process.env.NODE_ENV !== 'production') {
     config({ path: '.env.local' });
 }
 
-export async function runSeed() {
-    if (!process.env.POSTGRES_URL) {
-        throw new Error('POSTGRES_URL is not defined');
-    }
+async function runSeed() {
+  console.log('⏳ Seeding database...');
+  try {
+    // Add your seed data here
+    await db.insert(user).values([
+      {
+        email: 'test@example.com',
+        password: 'password123',
+      },
+    ]);
 
-    console.log('⏳ Seeding database...');
-    const start = Date.now();
+    await seedTarotCards();
+    await seedSpreads();
 
-    // Create a new postgres client
-    const client = postgres(process.env.POSTGRES_URL);
-
-    try {
-        // Check if we need to run seeds
-        const cardsCount = Number((await client`SELECT COUNT(*) FROM "tarot_card"`)[0].count);
-        const spreadsCount = Number((await client`SELECT COUNT(*) FROM "spread"`)[0].count);
-
-        let seeded = false;
-
-        if (cardsCount === 0) {
-            console.log('⏳ Seeding tarot cards...');
-            await seedTarotCards(client);
-            console.log('✅ Tarot cards seeded');
-            seeded = true;
-        }
-
-        if (spreadsCount === 0) {
-            console.log('⏳ Seeding spreads...');
-            await seedSpreads(client);
-            console.log('✅ Spreads seeded');
-            seeded = true;
-        }
-
-        const end = Date.now();
-        if (seeded) {
-            console.log('✅ Seeding completed in', end - start, 'ms');
-        } else {
-            console.log('ℹ️ No seeding required - tables already have data');
-        }
-    } finally {
-        // Always close the client
-        await client.end();
-    }
+    console.log('✅ Database seeded successfully');
+  } catch (error) {
+    console.error('❌ Error seeding database:');
+    console.error('Unknown error:', error);
+    process.exit(1);
+  }
 }
 
-// Only run immediately if this is the main module
-if (require.main === module) {
-    runSeed().catch((err) => {
-        console.error('❌ Seeding failed');
-        console.error(err);
-        process.exit(1);
-    });
-}
+runSeed();

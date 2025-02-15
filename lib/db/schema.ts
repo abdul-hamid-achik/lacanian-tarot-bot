@@ -15,7 +15,6 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core';
 import { eq } from 'drizzle-orm';
-import { db } from './client';
 
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
@@ -31,6 +30,8 @@ export const chat = pgTable('chat', {
   title: text('title').notNull(),
   userId: uuid('user_id')
     .references(() => user.id),
+  anonymousUserId: uuid('anonymous_user_id')
+    .references(() => anonymousUser.id),
   visibility: varchar('visibility', { enum: ['public', 'private'] })
     .notNull()
     .default('private'),
@@ -207,18 +208,6 @@ export const messageTheme = pgTable('message_theme', {
 }, (table) => ({
   pk: primaryKey({ columns: [table.messageId, table.themeId] })
 }));
-
-// Update the getMessageThemes function to use the new table
-export async function getMessageThemes(messageId: string) {
-  return db
-    .select({
-      userId: messageTheme.userId,
-      themeId: messageTheme.themeId,
-      relevance: messageTheme.relevance
-    })
-    .from(messageTheme)
-    .where(eq(messageTheme.messageId, messageId));
-}
 
 // Anonymous user session management
 export const anonymousUser = pgTable('anonymous_user', {

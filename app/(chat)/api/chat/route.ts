@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
-import { PersonaManager, } from '@/lib/persona';
+import { PersonaManager } from '@/lib/persona';
 import { PersonalizedCardSelector } from '@/lib/card-selector';
-import { createDataStreamResponse } from '@/lib/streaming';
-import { streamText } from '@/lib/ai/stream';
 import { db } from '@/lib/db/client';
-import { cardReading, type Spread, } from '@/lib/db/schema';
+import { cardReading, type Spread } from '@/lib/db/schema';
 import { customModel } from '@/lib/ai';
 import {
   deleteChatById,
   getChatById,
   getChatsByUserId,
   saveChat,
+  getOrCreateAnonymousUser,
 } from '@/lib/db/queries';
 import { generateTitleFromUserMessage } from '../../actions';
 import { sql } from 'drizzle-orm';
@@ -20,6 +19,12 @@ import { getSpreadById } from '@/lib/spreads';
 import { StatusCodes } from 'http-status-codes';
 import { createTarotError } from '@/lib/errors';
 import { cookies } from 'next/headers';
+import { streamText } from 'ai';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const personaManager = new PersonaManager();
 const cardSelector = new PersonalizedCardSelector();
@@ -76,6 +81,23 @@ interface ChatMessage {
   name: string;
 }
 
+// Helper function to generate UUID using Web Crypto API
+function generateUUID() {
+  const array = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(array);
+  
+  // Set version (4) and variant (2) bits
+  array[6] = (array[6] & 0x0f) | 0x40;
+  array[8] = (array[8] & 0x3f) | 0x80;
+  
+  // Convert to hex string with proper UUID format
+  const hex = Array.from(array)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -90,104 +112,103 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth().catch(() => null);
-  const { messages, id: chatId }: { messages: ChatMessage[]; id: string } = await request.json();
-  const latestMessage = messages[messages.length - 1].content;
-
-  // Get or create chat
-  const existingChat = await getChatById({ id: chatId });
-  if (!existingChat) {
-    const title = await generateTitleFromUserMessage({ 
-      message: { role: 'user', content: latestMessage } 
+  try {
+    const session = await auth().catch((error) => {
+      console.error('Auth error:', error);
+      return null;
     });
-    await saveChat({ 
-      id: chatId, 
-      userId: session?.user?.id, // Optional userId for anonymous chats
-      title 
-    });
-  }
+    
+    const { messages, chatId, userId: requestUserId, spread }: { 
+      messages: { role: string; content: string }[]; 
+      chatId: string;
+      userId?: string;
+      spread?: SpreadWithPositions;
+    } = await request.json();
 
-  // Detect tarot intent
-  const intent = detectTarotIntent(latestMessage);
-  
-  // Get cookie for anonymous session
-  const cookieStore = await cookies();
-  const sessionId = cookieStore.get('anonymous_session')?.value;
+    const latestMessage = messages[messages.length - 1].content;
 
-  const userPersona = session?.user?.id 
-    ? await personaManager.getPersona(session.user.id)
-    : await personaManager.getPersona('anonymous', sessionId);
+    // Get cookie for anonymous session
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('anonymous_session')?.value;
 
-  if (intent.type !== 'none') {
-    let selectedCards;
-    let spreadInfo: SpreadWithPositions | null = null;
-
-    if (intent.type === 'spread' && intent.spreadId) {
-      // Get the requested spread
-      const spread = await getSpreadById(intent.spreadId);
-      if (!spread) {
-        return NextResponse.json(
-          createTarotError(StatusCodes.NOT_FOUND, "The spread you seek eludes the cards' vision"),
-          { status: StatusCodes.NOT_FOUND }
-        );
-      }
-      spreadInfo = spread as SpreadWithPositions;
-      // Draw cards for each position in the spread
-      selectedCards = await drawPersonalizedCards(spreadInfo.positions.length, userPersona);
-    } else {
-      // Handle regular card drawing
-      const { numCards } = parseTarotRequest(latestMessage);
-      selectedCards = await drawPersonalizedCards(numCards, userPersona);
+    // Get or create anonymous user if no authenticated session
+    let anonymousUserId: string | undefined;
+    if (!session?.user) {
+      const anonUser = await getOrCreateAnonymousUser(sessionId || crypto.randomUUID());
+      anonymousUserId = anonUser.id;
     }
 
-    // Generate personalized interpretation
-    return createDataStreamResponse({
-      execute: async (dataStream) => {
-        const systemMessage = `You are a Lacanian Tarot reader. Interpret the cards through a psychoanalytic lens.
-Consider the user's themes: ${userPersona.themes.map(t => `${t.name} (weight: ${t.weight})`).join(', ')}
-
-${spreadInfo ? `
-You are using the "${spreadInfo.name}" spread:
-${spreadInfo.description}
-
-Card Positions:
-${spreadInfo.positions.map((pos: SpreadPosition, i: number) => `${i + 1}. ${pos.name}: ${pos.description}`).join('\n')}
-` : ''}`;
-
-        return streamText({
-          model: customModel('gpt-4o'),
-          messages: [
-            { role: 'system', content: systemMessage, name: 'system' },
-            ...messages,
-            {
-              role: 'assistant',
-              name: 'assistant',
-              content: JSON.stringify({
-                type: 'cards',
-                spread: spreadInfo,
-                cards: selectedCards.map((card, i) => ({
-                  ...card,
-                  position: spreadInfo?.positions[i]
-                }))
-              })
-            }
-          ],
-          stream: dataStream,
-        });
-      }
+    // Get or create chat
+    const existingChat = await getChatById({ id: chatId }).catch((error) => {
+      console.error('Error getting chat:', error);
+      return null;
     });
-  }
 
-  // Handle regular chat messages
-  return createDataStreamResponse({
-    execute: async (dataStream) => {
-      return streamText({
-        model: customModel('gpt-4'),
-        messages,
-        stream: dataStream,
+    if (!existingChat) {
+      try {
+        const title = await generateTitleFromUserMessage({ 
+          message: { role: 'user', content: latestMessage } 
+        });
+        await saveChat({ 
+          id: chatId, 
+          userId: session?.user?.id,
+          anonymousUserId,
+          title 
+        });
+      } catch (error) {
+        console.error('Error creating chat:', error);
+        throw error;
+      }
+    }
+
+    // Get user persona
+    const userPersona = session?.user?.id 
+      ? await personaManager.getPersona(session.user.id)
+      : await personaManager.getPersona('anonymous', sessionId);
+
+    // If spread is provided, draw cards
+    let selectedCards;
+    if (spread) {
+      selectedCards = await drawPersonalizedCards(spread.positions.length, userPersona);
+    }
+
+    // Format the message for the AI
+    const aiMessages = messages.map(m => ({
+      role: m.role as 'user' | 'assistant' | 'system',
+      content: m.content
+    }));
+
+    // Add system message with tarot context if needed
+    if (spread && selectedCards) {
+      aiMessages.unshift({
+        role: 'system',
+        content: JSON.stringify({
+          type: 'cards',
+          cards: selectedCards,
+          spread
+        })
       });
     }
-  });
+
+    // Create stream
+    const response = await openai.chat.completions.create({
+      model: customModel('gpt-4-turbo-preview'),
+      messages: aiMessages,
+      temperature: 0.7,
+      stream: true
+    });
+
+    // Use Vercel's AI SDK to handle streaming
+    const stream = streamText(response);
+    return stream.toDataStreamResponse();
+
+  } catch (error) {
+    console.error('Chat error:', error);
+    return new Response(
+      JSON.stringify(createTarotError(StatusCodes.INTERNAL_SERVER_ERROR)),
+      { status: StatusCodes.INTERNAL_SERVER_ERROR }
+    );
+  }
 }
 
 export async function PATCH(request: Request) {

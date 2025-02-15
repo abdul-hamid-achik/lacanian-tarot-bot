@@ -21,6 +21,9 @@ services:
       POSTGRES_DB: postgres
     ports:
       - "5432:5432"
+    command: ["postgres", "-c", "shared_preload_libraries=vector"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   postgres-http:
     image: ghcr.io/neondatabase/wsproxy:latest
@@ -49,3 +52,4 @@ services:
 
 volumes:
   minio_data:
+  postgres_data:

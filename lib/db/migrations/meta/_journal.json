@@ -57,6 +57,13 @@
       "when": 1737825380838,
       "tag": "0007_even_groot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1739642915495,
+      "tag": "0008_dry_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

@@ -2,9 +2,17 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
-  // experimental: {
-  //   ppr: true,
-  // },
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+    level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
+  },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
+  },
   images: {
     remotePatterns: [
       {

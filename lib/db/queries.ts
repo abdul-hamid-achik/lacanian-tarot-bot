@@ -17,6 +17,7 @@ import {
   anonymousUser,
   type AnonymousUser,
   anonymousUserTheme,
+  messageTheme,
 } from './schema';
 import { db } from './client';
 import { DatabaseErrors } from '../errors';
@@ -49,10 +50,12 @@ export async function createUser(email: string, password: string) {
 export async function saveChat({
   id,
   userId,
+  anonymousUserId,
   title,
 }: {
   id: string;
   userId?: string;
+  anonymousUserId?: string;
   title: string;
 }) {
   try {
@@ -60,8 +63,9 @@ export async function saveChat({
       id,
       createdAt: new Date(),
       userId,
+      anonymousUserId,
       title,
-      visibility: 'private',
+      visibility: userId ? 'private' : 'public',
     };
     return await db.insert(chat).values(newChat);
   } catch (error) {
@@ -431,4 +435,15 @@ export async function updateAnonymousUserTheme(
     console.error('Failed to update anonymous user theme:', error);
     throw error;
   }
+}
+
+export async function getMessageThemes(messageId: string) {
+  return db
+    .select({
+      userId: messageTheme.userId,
+      themeId: messageTheme.themeId,
+      relevance: messageTheme.relevance
+    })
+    .from(messageTheme)
+    .where(eq(messageTheme.messageId, messageId));
 }

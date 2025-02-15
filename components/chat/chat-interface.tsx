@@ -8,6 +8,7 @@ import { SpreadSelector } from '../spread/SpreadSelector';
 import { SpreadDisplay } from '../spread/SpreadDisplay';
 import { PREDEFINED_SPREADS } from '@/lib/spreads';
 import type { Spread, TarotCard as TarotCardType, SpreadPosition } from '@/lib/db/types';
+import { useChat } from 'ai/react';
 
 interface Message {
     id: string;
@@ -28,9 +29,12 @@ interface TarotResponse {
 }
 
 export function ChatInterface({ userId }: ChatInterfaceProps) {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+        api: '/api/chat',
+        body: {
+            userId,
+        },
+    });
     const [selectedSpread, setSelectedSpread] = useState<string>('');
     const [chatId] = useState(() => crypto.randomUUID());
 
@@ -38,7 +42,7 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
         setSelectedSpread(spreadId);
         const spread = PREDEFINED_SPREADS[spreadId];
         if (spread) {
-            setInput(`Please do a ${spread.name} reading for me.`);
+            handleInputChange({ target: { value: `Please do a ${spread.name} reading for me.` } } as any);
         }
     };
 
@@ -58,107 +62,51 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
 
-        const messageId = crypto.randomUUID();
-        const userMessage: Message = {
-            id: messageId,
-            role: 'user',
-            content: input,
-            createdAt: new Date()
-        };
-
-        setMessages(prev => [...prev, userMessage]);
-        setInput('');
-        setIsLoading(true);
-
-        try {
-            const spread = selectedSpread ? PREDEFINED_SPREADS[selectedSpread] : undefined;
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    messages: [...messages, userMessage],
-                    id: chatId,
+        const spread = selectedSpread ? PREDEFINED_SPREADS[selectedSpread] : undefined;
+        handleSubmit(e, {
+            body: {
+                chatId,
+                userId,
+                spread: spread ? {
+                    id: selectedSpread,
+                    name: spread.name,
+                    description: spread.description,
+                    positions: spread.positions,
                     userId,
-                    spread: spread ? {
-                        id: selectedSpread,
-                        name: spread.name,
-                        description: spread.description,
-                        positions: spread.positions,
-                        userId,
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                        isPublic: false
-                    } : undefined
-                })
-            });
-
-            if (!response.ok) throw new Error('Failed to send message');
-
-            const reader = response.body?.getReader();
-            if (!reader) throw new Error('No reader available');
-
-            let accumulatedMessage = '';
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = new TextDecoder().decode(value);
-                accumulatedMessage += chunk;
-
-                // Update the message in real-time
-                setMessages(prev => {
-                    const lastMessage = prev[prev.length - 1];
-                    if (lastMessage?.role === 'assistant') {
-                        return [
-                            ...prev.slice(0, -1),
-                            { ...lastMessage, content: accumulatedMessage }
-                        ];
-                    } else {
-                        return [
-                            ...prev,
-                            {
-                                id: crypto.randomUUID(),
-                                role: 'assistant',
-                                content: accumulatedMessage,
-                                createdAt: new Date()
-                            }
-                        ];
-                    }
-                });
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    isPublic: false
+                } : undefined
             }
-        } catch (error) {
-            console.error('Failed to send message:', error);
-            setMessages(prev => [
-                ...prev,
-                {
-                    id: crypto.randomUUID(),
-                    role: 'assistant',
-                    content: 'Sorry, something went wrong. Please try again.',
-                    createdAt: new Date()
-                }
-            ]);
-        } finally {
-            setIsLoading(false);
-            setSelectedSpread('');
-        }
+        });
+        setSelectedSpread('');
     };
 
     return (
         <div className="flex h-full flex-col space-y-4">
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
                 {messages.map((message) => {
-                    const isTarotReading = message.role === 'assistant' && message.content.includes('"type":"cards"');
                     let tarotResponse: TarotResponse | undefined;
+                    let messageContent = message.content;
 
-                    if (isTarotReading) {
+                    // Only try to parse as JSON if it looks like a tarot reading
+                    if (message.role === 'assistant') {
                         try {
-                            tarotResponse = JSON.parse(message.content) as TarotResponse;
+                            // Accumulate the streamed content until we have a complete JSON object
+                            if (message.content.startsWith('{') && message.content.endsWith('}')) {
+                                const parsed = JSON.parse(message.content);
+                                if (parsed.type === 'cards') {
+                                    tarotResponse = parsed as TarotResponse;
+                                    messageContent = parsed.interpretation || message.content;
+                                }
+                            }
                         } catch (e) {
-                            console.error('Failed to parse tarot reading:', e);
+                            // If parsing fails, just display the content as is
+                            console.debug('Not a JSON message:', e);
                         }
                     }
 
@@ -178,8 +126,8 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
                                         className="mb-4"
                                     />
                                 )}
-                                <div className="prose dark:prose-invert">
-                                    {tarotResponse?.interpretation || message.content}
+                                <div className="prose dark:prose-invert whitespace-pre-wrap">
+                                    {messageContent}
                                 </div>
                                 <div className="flex justify-end space-x-2">
                                     <Button
@@ -204,7 +152,7 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
             </div>
 
             <div className="border-t p-4">
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={onSubmit} className="space-y-4">
                     <SpreadSelector
                         onSpreadSelect={handleSpreadSelect}
                         className="mb-4"
@@ -212,7 +160,7 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
                     <div className="flex space-x-4">
                         <Input
                             value={input}
-                            onChange={e => setInput(e.target.value)}
+                            onChange={handleInputChange}
                             placeholder="Ask about your cards..."
                             disabled={isLoading}
                         />
