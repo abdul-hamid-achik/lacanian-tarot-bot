@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 export class TextEmbedder {
-    private openai: OpenAI;
+    private openai: InstanceType<typeof OpenAI>;
     private model = 'text-embedding-3-small';
 
     constructor() {
@@ -33,7 +33,7 @@ export class TextEmbedder {
                 encoding_format: 'float'
             });
 
-            batches.push(...response.data.map(d => d.embedding));
+            batches.push(...response.data.map((d: { embedding: number[] }) => d.embedding));
         }
 
         return batches;

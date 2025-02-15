@@ -78,7 +78,6 @@ export async function POST(request: Request) {
   if (session.user?.id) {
     try {
       const document = await saveDocument({
-        id,
         content,
         title,
         kind,

@@ -1,16 +1,8 @@
 import type { PersonalizedCardSelector } from './card-selector';
 import type { UserPersona } from './persona';
 import type { Spread, TarotCard, SpreadPosition } from './db/types';
-import { spread as spreadTable } from './db/schema';
 
-export interface SpreadPosition {
-    name: string;
-    description: string;
-    themeMultiplier: number;
-    position: number;
-}
-
-export type Spread = Spread;
+export type { Spread, SpreadPosition };
 
 export const PREDEFINED_SPREADS: Record<string, Omit<Spread, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> = {
     'past-present-future': {

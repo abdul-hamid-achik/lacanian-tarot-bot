@@ -10,6 +10,7 @@ import { customModel } from '@/lib/ai';
 import {
   deleteChatById,
   getChatById,
+  getChatsByUserId,
   saveChat,
 } from '@/lib/db/queries';
 import { generateTitleFromUserMessage } from '../../actions';
@@ -100,7 +101,9 @@ export async function POST(request: Request) {
   const latestMessage = messages[messages.length - 1].content;
   const existingChat = await getChatById({ id: chatId });
   if (!existingChat) {
-    const title = generateTitleFromUserMessage(latestMessage);
+    const title = await generateTitleFromUserMessage({ 
+      message: { role: 'user', content: latestMessage } 
+    });
     await saveChat({ id: chatId, userId: session.user.id, title });
   }
 

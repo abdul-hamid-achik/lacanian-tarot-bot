@@ -44,14 +44,17 @@ export async function createUser(email: string, password: string) {
 }
 
 export async function saveChat({
+  id,
   userId,
   title,
 }: {
+  id: string;
   userId: string;
   title: string;
 }) {
   try {
     const newChat: typeof chat.$inferInsert = {
+      id,
       createdAt: new Date(),
       userId,
       title,
