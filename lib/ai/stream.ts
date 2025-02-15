@@ -47,11 +47,13 @@ export async function streamText({
                 }
             };
 
-            const parser = createParser(onParse as ParserCallbacks);
+            const parser = createParser(onParse);
 
             for await (const chunk of response) {
-                const json = chunk.choices[0]?.delta?.content || '';
-                parser.feed(decoder.decode(encoder.encode(json)));
+                const text = chunk.choices[0]?.delta?.content;
+                if (text) {
+                    parser.feed(text);
+                }
             }
 
             controller.close();
