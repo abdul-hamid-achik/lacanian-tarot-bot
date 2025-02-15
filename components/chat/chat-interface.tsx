@@ -8,14 +8,8 @@ import { SpreadSelector } from '../spread/SpreadSelector';
 import { SpreadDisplay } from '../spread/SpreadDisplay';
 import { PREDEFINED_SPREADS } from '@/lib/spreads';
 import type { Spread, TarotCard as TarotCardType, SpreadPosition } from '@/lib/db/types';
-import { useChat } from 'ai/react';
-
-interface Message {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    createdAt: Date;
-}
+import { useChat } from '@ai-sdk/react';
+import type { Message } from 'ai';
 
 interface ChatInterfaceProps {
     userId: string;

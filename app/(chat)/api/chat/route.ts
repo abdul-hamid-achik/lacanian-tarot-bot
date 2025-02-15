@@ -19,28 +19,28 @@ import { getSpreadById } from '@/lib/spreads';
 import { StatusCodes } from 'http-status-codes';
 import { createTarotError } from '@/lib/errors';
 import { cookies } from 'next/headers';
-import { streamText } from 'ai';
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
+import { createDataStream, createDataStreamResponse } from 'ai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Use the interface from schema directly
+interface SpreadWithPositions extends Spread {
+  positions: {
+    name: string;
+    description: string;
+    themeMultiplier: number;
+    position: number;
+  }[];
+}
 
 const personaManager = new PersonaManager();
 const cardSelector = new PersonalizedCardSelector();
 
-interface SpreadPosition {
-  name: string;
-  description: string;
-  themeMultiplier: number;
-  position: number;
-}
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-interface SpreadWithPositions extends Spread {
-  positions: SpreadPosition[];
-}
-
-// Example: new function for drawing tarot
+// Example: new function for drawing tarot cards
 // (you need a real DB query to fetch random cards)
 async function drawRandomTarotCards(numCards: number) {
   return await db.select().from(cardReading).orderBy(sql`random()`).limit(numCards);
@@ -190,17 +190,27 @@ export async function POST(request: Request) {
       });
     }
 
-    // Create stream
+    // Create the streaming response using the latest Vercel AI SDK pattern
     const response = await openai.chat.completions.create({
-      model: customModel('gpt-4-turbo-preview'),
+      model: 'gpt-4-0125-preview', // Using GPT-4 Mini for better efficiency
       messages: aiMessages,
       temperature: 0.7,
-      stream: true
+      stream: true,
     });
 
-    // Use Vercel's AI SDK to handle streaming
-    const stream = streamText(response);
-    return stream.toDataStreamResponse();
+    // Convert the response to a stream using createDataStreamResponse
+    return createDataStreamResponse({
+      statusText: 'OK',
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      execute: async (writer) => {
+        for await (const chunk of response) {
+          const text = chunk.choices[0]?.delta?.content;
+          if (text) {
+            writer.write(text);
+          }
+        }
+      }
+    });
 
   } catch (error) {
     console.error('Chat error:', error);

@@ -21,7 +21,8 @@
     "db:deploy": "tsx lib/db/migrate.ts && tsx lib/db/seeds/index.ts"
   },
   "dependencies": {
-    "@ai-sdk/openai": "1.0.6",
+    "@ai-sdk/openai": "^1.0.6",
+    "@ai-sdk/react": "^1.1.16",
     "@auth/drizzle-adapter": "^1.7.4",
     "@codemirror/lang-javascript": "^6.2.2",
     "@codemirror/lang-python": "^6.1.6",
@@ -49,7 +50,6 @@
     "@vercel/blob": "^0.24.1",
     "@vercel/kv": "^3.0.0",
     "@vercel/postgres": "^0.10.0",
-    "ai": "4.0.20",
     "bcrypt-ts": "^5.0.2",
     "class-variance-authority": "^0.7.0",
     "classnames": "^2.5.1",
@@ -70,7 +70,6 @@
     "next": "15.1.7",
     "next-auth": "5.0.0-beta.25",
     "next-themes": "^0.3.0",
-    "openai": "^4.79.4",
     "orderedmap": "^2.1.1",
     "pg": "^8.13.1",
     "postgres": "^3.4.5",

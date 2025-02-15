@@ -1,7 +1,7 @@
 'use client';
 
 import type { Attachment, Message } from 'ai';
-import { useChat } from 'ai/react';
+import { useChat } from 'ai';
 import { useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { useSession } from 'next-auth/react';
