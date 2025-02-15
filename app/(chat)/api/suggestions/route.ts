@@ -1,27 +1,36 @@
 import { auth } from '@/app/(auth)/auth';
 import { getSuggestionsByDocumentId } from '@/lib/db/queries';
 import { StatusCodes } from 'http-status-codes';
-import { createTarotError } from '@/lib/errors';
+import { createTarotResponse, createTarotError, TarotAPIError } from '@/lib/errors';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+const SuggestionSchema = z.object({
+  id: z.string(),
+  documentId: z.string(),
+  userId: z.string(),
+  content: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+const SuggestionListSchema = z.array(SuggestionSchema);
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const documentId = searchParams.get('documentId');
 
   if (!documentId) {
-    return NextResponse.json(
-      createTarotError(StatusCodes.BAD_REQUEST, "The oracle requires a scroll to divine its suggestions"),
-      { status: StatusCodes.BAD_REQUEST }
+    throw new TarotAPIError(
+      StatusCodes.BAD_REQUEST,
+      "The oracle requires a scroll to divine its suggestions"
     );
   }
 
   const session = await auth();
 
   if (!session || !session.user) {
-    return NextResponse.json(
-      createTarotError(StatusCodes.UNAUTHORIZED),
-      { status: StatusCodes.UNAUTHORIZED }
-    );
+    throw new TarotAPIError(StatusCodes.UNAUTHORIZED);
   }
 
   try {
@@ -32,21 +41,26 @@ export async function GET(request: Request) {
     const [suggestion] = suggestions;
 
     if (!suggestion) {
-      return NextResponse.json([], { status: StatusCodes.OK });
+      return NextResponse.json(createTarotResponse([]));
     }
 
     if (suggestion.userId !== session.user.id) {
-      return NextResponse.json(
-        createTarotError(StatusCodes.FORBIDDEN),
-        { status: StatusCodes.FORBIDDEN }
-      );
+      throw new TarotAPIError(StatusCodes.FORBIDDEN);
     }
 
-    return NextResponse.json(suggestions);
+    const validatedSuggestions = SuggestionListSchema.parse(suggestions);
+    return NextResponse.json(createTarotResponse(validatedSuggestions));
   } catch (error) {
-    return NextResponse.json(
-      createTarotError(StatusCodes.INTERNAL_SERVER_ERROR),
-      { status: StatusCodes.INTERNAL_SERVER_ERROR }
-    );
+    if (error instanceof z.ZodError) {
+      console.error('Suggestion validation error:', error);
+      throw new TarotAPIError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "The mystical patterns of the suggestions are misaligned"
+      );
+    }
+    if (error instanceof TarotAPIError) {
+      return NextResponse.json(error.toResponse(), { status: error.statusCode });
+    }
+    throw new TarotAPIError(StatusCodes.INTERNAL_SERVER_ERROR);
   }
 }

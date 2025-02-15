@@ -17,12 +17,13 @@ import { sql } from 'drizzle-orm';
 import { drawPersonalizedCards } from '@/lib/cards';
 import { getSpreadById } from '@/lib/spreads';
 import { StatusCodes } from 'http-status-codes';
-import { createTarotError } from '@/lib/errors';
+import { createTarotResponse, createTarotError, TarotAPIError } from '@/lib/errors';
 import { cookies } from 'next/headers';
 import { OpenAI } from 'openai';
 import { createDataStream, createDataStreamResponse } from 'ai';
+import { z } from 'zod';
+import { DataStreamWriter } from 'ai';
 
-// Use the interface from schema directly
 interface SpreadWithPositions extends Spread {
   positions: {
     name: string;
@@ -35,31 +36,25 @@ interface SpreadWithPositions extends Spread {
 const personaManager = new PersonaManager();
 const cardSelector = new PersonalizedCardSelector();
 
-// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Example: new function for drawing tarot cards
-// (you need a real DB query to fetch random cards)
 async function drawRandomTarotCards(numCards: number) {
   return await db.select().from(cardReading).orderBy(sql`random()`).limit(numCards);
 }
 
-// Enhanced intent detection for different tarot actions
 function detectTarotIntent(message: string): {
   type: 'spread' | 'reading' | 'none';
   spreadId?: string;
 } {
   const msg = message.toLowerCase();
 
-  // Check for spread selection
   const spreadMatch = msg.match(/use spread (\w+)/);
   if (spreadMatch) {
     return { type: 'spread', spreadId: spreadMatch[1] };
   }
 
-  // Check for general reading request
   const readingKeywords = ['tarot', 'cards', 'reading', 'draw'];
   if (readingKeywords.some(keyword => msg.includes(keyword))) {
     return { type: 'reading' };
@@ -75,22 +70,65 @@ function parseTarotRequest(message: string): { numCards: number } {
   };
 }
 
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  name: string;
-}
+const ChatMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(),
+  name: z.string().optional(),
+});
 
-// Helper function to generate UUID using Web Crypto API
+type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+const ChatRequestSchema = z.object({
+  messages: z.array(z.object({
+    role: z.string(),
+    content: z.string()
+  })),
+  chatId: z.string(),
+  userId: z.string().optional(),
+  spread: z.any().optional()
+});
+
+const ChatResponseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  userId: z.string().optional(),
+  anonymousUserId: z.string().optional(),
+  isPublic: z.boolean(),
+});
+
+const ChatListResponseSchema = z.array(ChatResponseSchema);
+
+const ChatVoteRequestSchema = z.object({
+  chatId: z.string(),
+  messageId: z.string(),
+  type: z.enum(['upvote', 'downvote']),
+});
+
+const ChatVoteResponseSchema = z.object({
+  success: z.boolean(),
+});
+
+const ChatDeleteResponseSchema = z.object({
+  message: z.string(),
+});
+
+const StreamingResponseSchema = z.object({
+  statusText: z.string(),
+  headers: z.record(z.string()),
+  execute: z.function()
+    .args(z.custom<DataStreamWriter>())
+    .returns(z.promise(z.void()))
+});
+
 function generateUUID() {
   const array = new Uint8Array(16);
   globalThis.crypto.getRandomValues(array);
   
-  // Set version (4) and variant (2) bits
   array[6] = (array[6] & 0x0f) | 0x40;
   array[8] = (array[8] & 0x3f) | 0x80;
   
-  // Convert to hex string with proper UUID format
   const hex = Array.from(array)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
@@ -102,13 +140,25 @@ export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json(
-      createTarotError(StatusCodes.UNAUTHORIZED),
+      createTarotResponse(undefined, createTarotError(StatusCodes.UNAUTHORIZED)),
       { status: StatusCodes.UNAUTHORIZED }
     );
   }
 
-  const chats = await getChatsByUserId({ id: session.user.id });
-  return NextResponse.json(chats);
+  try {
+    const chats = await getChatsByUserId({ id: session.user.id });
+    const validatedChats = ChatListResponseSchema.parse(chats);
+    return NextResponse.json(createTarotResponse(validatedChats));
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('Chat validation error:', error);
+      throw new TarotAPIError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "The cosmic forces have misaligned the chat patterns"
+      );
+    }
+    throw new TarotAPIError(StatusCodes.INTERNAL_SERVER_ERROR);
+  }
 }
 
 export async function POST(request: Request) {
@@ -118,27 +168,20 @@ export async function POST(request: Request) {
       return null;
     });
     
-    const { messages, chatId, userId: requestUserId, spread }: { 
-      messages: { role: string; content: string }[]; 
-      chatId: string;
-      userId?: string;
-      spread?: SpreadWithPositions;
-    } = await request.json();
+    const body = await request.json();
+    const { messages, chatId, userId: requestUserId, spread } = ChatRequestSchema.parse(body);
 
     const latestMessage = messages[messages.length - 1].content;
 
-    // Get cookie for anonymous session
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('anonymous_session')?.value;
 
-    // Get or create anonymous user if no authenticated session
     let anonymousUserId: string | undefined;
     if (!session?.user) {
       const anonUser = await getOrCreateAnonymousUser(sessionId || crypto.randomUUID());
       anonymousUserId = anonUser.id;
     }
 
-    // Get or create chat
     const existingChat = await getChatById({ id: chatId }).catch((error) => {
       console.error('Error getting chat:', error);
       return null;
@@ -157,28 +200,24 @@ export async function POST(request: Request) {
         });
       } catch (error) {
         console.error('Error creating chat:', error);
-        throw error;
+        throw new TarotAPIError(StatusCodes.INTERNAL_SERVER_ERROR);
       }
     }
 
-    // Get user persona
     const userPersona = session?.user?.id 
       ? await personaManager.getPersona(session.user.id)
       : await personaManager.getPersona('anonymous', sessionId);
 
-    // If spread is provided, draw cards
     let selectedCards;
     if (spread) {
       selectedCards = await drawPersonalizedCards(spread.positions.length, userPersona);
     }
 
-    // Format the message for the AI
     const aiMessages = messages.map(m => ({
       role: m.role as 'user' | 'assistant' | 'system',
       content: m.content
     }));
 
-    // Add system message with tarot context if needed
     if (spread && selectedCards) {
       aiMessages.unshift({
         role: 'system',
@@ -190,19 +229,17 @@ export async function POST(request: Request) {
       });
     }
 
-    // Create the streaming response using the latest Vercel AI SDK pattern
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-0125-preview', // Using GPT-4 Mini for better efficiency
+      model: 'gpt-4-0125-preview',
       messages: aiMessages,
       temperature: 0.7,
       stream: true,
     });
 
-    // Convert the response to a stream using createDataStreamResponse
     return createDataStreamResponse({
       statusText: 'OK',
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      execute: async (writer) => {
+      execute: async (writer: DataStreamWriter) => {
         for await (const chunk of response) {
           const text = chunk.choices[0]?.delta?.content;
           if (text) {
@@ -214,8 +251,17 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Chat error:', error);
-    return new Response(
-      JSON.stringify(createTarotError(StatusCodes.INTERNAL_SERVER_ERROR)),
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        createTarotResponse(undefined, createTarotError(StatusCodes.BAD_REQUEST, "The cards cannot interpret your request's pattern")),
+        { status: StatusCodes.BAD_REQUEST }
+      );
+    }
+    if (error instanceof TarotAPIError) {
+      return NextResponse.json(error.toResponse(), { status: error.statusCode });
+    }
+    return NextResponse.json(
+      createTarotResponse(undefined, createTarotError(StatusCodes.INTERNAL_SERVER_ERROR)),
       { status: StatusCodes.INTERNAL_SERVER_ERROR }
     );
   }
@@ -225,21 +271,32 @@ export async function PATCH(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json(
-      createTarotError(StatusCodes.UNAUTHORIZED),
+      createTarotResponse(undefined, createTarotError(StatusCodes.UNAUTHORIZED)),
       { status: StatusCodes.UNAUTHORIZED }
     );
   }
 
-  const { chatId, messageId, type } = await request.json();
+  try {
+    const body = await request.json();
+    const { chatId, messageId, type } = ChatVoteRequestSchema.parse(body);
 
-  // Update theme weights based on feedback
-  await personaManager.updateThemeWeight(
-    session.user.id,
-    chatId,
-    type === 'upvote' ? 1 : -1
-  );
+    await personaManager.updateThemeWeight(
+      session.user.id,
+      chatId,
+      type === 'upvote' ? 1 : -1
+    );
 
-  return NextResponse.json({ success: true });
+    const response = ChatVoteResponseSchema.parse({ success: true });
+    return NextResponse.json(createTarotResponse(response));
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        createTarotResponse(undefined, createTarotError(StatusCodes.BAD_REQUEST, "The cosmic forces cannot interpret your vote")),
+        { status: StatusCodes.BAD_REQUEST }
+      );
+    }
+    throw new TarotAPIError(StatusCodes.INTERNAL_SERVER_ERROR);
+  }
 }
 
 export async function DELETE(request: Request) {
@@ -247,43 +304,43 @@ export async function DELETE(request: Request) {
   const id = searchParams.get('id');
 
   if (!id) {
-    return NextResponse.json(
-      createTarotError(StatusCodes.BAD_REQUEST, "The cards cannot find what you seek to remove"),
-      { status: StatusCodes.BAD_REQUEST }
+    throw new TarotAPIError(
+      StatusCodes.BAD_REQUEST,
+      "The cards cannot find what you seek to remove"
     );
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json(
-      createTarotError(StatusCodes.UNAUTHORIZED),
-      { status: StatusCodes.UNAUTHORIZED }
-    );
+    throw new TarotAPIError(StatusCodes.UNAUTHORIZED);
   }
 
   try {
     const chat = await getChatById({ id });
     if (!chat) {
-      return NextResponse.json(
-        createTarotError(StatusCodes.NOT_FOUND),
-        { status: StatusCodes.NOT_FOUND }
-      );
+      throw new TarotAPIError(StatusCodes.NOT_FOUND);
     }
 
     if (chat.userId !== session.user.id) {
-      return NextResponse.json(
-        createTarotError(StatusCodes.FORBIDDEN),
-        { status: StatusCodes.FORBIDDEN }
-      );
+      throw new TarotAPIError(StatusCodes.FORBIDDEN);
     }
 
     await deleteChatById({ id });
-    return NextResponse.json({ message: "The cards have faded into the mists of time" });
+    
+    const response = ChatDeleteResponseSchema.parse({
+      message: "The cards have faded into the mists of time"
+    });
+    return NextResponse.json(createTarotResponse(response));
   } catch (error) {
-    console.error('Error deleting chat:', error);
-    return NextResponse.json(
-      createTarotError(StatusCodes.INTERNAL_SERVER_ERROR),
-      { status: StatusCodes.INTERNAL_SERVER_ERROR }
-    );
+    if (error instanceof z.ZodError) {
+      throw new TarotAPIError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "The cosmic forces have misaligned while removing your chat"
+      );
+    }
+    if (error instanceof TarotAPIError) {
+      return NextResponse.json(error.toResponse(), { status: error.statusCode });
+    }
+    throw new TarotAPIError(StatusCodes.INTERNAL_SERVER_ERROR);
   }
 }

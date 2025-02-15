@@ -1,12 +1,32 @@
 import { auth } from '@/app/(auth)/auth';
 import { getVotesByChatId, voteMessage, getOrCreateAnonymousUser } from '@/lib/db/queries';
 import { StatusCodes } from 'http-status-codes';
-import { createTarotError } from '@/lib/errors';
+import { createTarotResponse, createTarotError, TarotAPIError } from '@/lib/errors';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db/client';
 import { anonymousVote } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { z } from 'zod';
+
+const VoteSchema = z.object({
+  id: z.string(),
+  userId: z.string().optional(),
+  anonymousUserId: z.string().optional(),
+  chatId: z.string(),
+  messageId: z.string(),
+  isUpvoted: z.boolean(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+const VoteListSchema = z.array(VoteSchema);
+
+const VoteRequestSchema = z.object({
+  chatId: z.string(),
+  messageId: z.string(),
+  type: z.enum(['up', 'down']),
+});
 
 // Helper function to generate UUID using Web Crypto API
 function generateUUID() {
@@ -30,40 +50,36 @@ export async function GET(request: Request) {
   const chatId = searchParams.get('chatId');
 
   if (!chatId) {
-    return NextResponse.json(
-      createTarotError(StatusCodes.BAD_REQUEST, "The cosmic energies require a conversation to resonate with"),
-      { status: StatusCodes.BAD_REQUEST }
+    throw new TarotAPIError(
+      StatusCodes.BAD_REQUEST,
+      "The cosmic energies require a conversation to resonate with"
     );
   }
 
   // Get votes regardless of authentication
   try {
     const votes = await getVotesByChatId({ id: chatId });
-    return NextResponse.json(votes);
+    const validatedVotes = VoteListSchema.parse(votes);
+    return NextResponse.json(createTarotResponse(validatedVotes));
   } catch (error) {
-    console.error('Error fetching votes:', error);
-    return NextResponse.json(
-      createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The cosmic forces are temporarily misaligned"),
-      { status: StatusCodes.INTERNAL_SERVER_ERROR }
+    if (error instanceof z.ZodError) {
+      console.error('Vote validation error:', error);
+      throw new TarotAPIError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "The mystical patterns of the votes are misaligned"
+      );
+    }
+    throw new TarotAPIError(
+      StatusCodes.INTERNAL_SERVER_ERROR,
+      "The cosmic forces are temporarily misaligned"
     );
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    const {
-      chatId,
-      messageId,
-      type,
-    }: { chatId: string; messageId: string; type: 'up' | 'down' } =
-      await request.json();
-
-    if (!chatId || !messageId || !type) {
-      return NextResponse.json(
-        createTarotError(StatusCodes.BAD_REQUEST, "The celestial alignment requires all elements to be present"),
-        { status: StatusCodes.BAD_REQUEST }
-      );
-    }
+    const body = await request.json();
+    const { chatId, messageId, type } = VoteRequestSchema.parse(body);
 
     const session = await auth().catch(() => null);
 
@@ -75,13 +91,17 @@ export async function PATCH(request: Request) {
         messageId,
         type: type,
       });
-      return NextResponse.json({ message: "Your spiritual resonance has been recorded" });
+      return NextResponse.json(createTarotResponse({
+        message: "Your spiritual resonance has been recorded"
+      }));
     }
 
     // Handle anonymous user vote
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('anonymous_session')?.value;
-    const response = NextResponse.json({ message: "Your spiritual resonance has been recorded" });
+    const response = NextResponse.json(createTarotResponse({
+      message: "Your spiritual resonance has been recorded"
+    }));
     
     if (!sessionId) {
       const newSessionId = generateUUID();
@@ -100,10 +120,18 @@ export async function PATCH(request: Request) {
     return response;
 
   } catch (error) {
-    console.error('Error processing vote:', error);
-    return NextResponse.json(
-      createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, "The cosmic forces are temporarily misaligned"),
-      { status: StatusCodes.INTERNAL_SERVER_ERROR }
+    if (error instanceof z.ZodError) {
+      throw new TarotAPIError(
+        StatusCodes.BAD_REQUEST,
+        "The celestial alignment requires all elements to be present"
+      );
+    }
+    if (error instanceof TarotAPIError) {
+      return NextResponse.json(error.toResponse(), { status: error.statusCode });
+    }
+    throw new TarotAPIError(
+      StatusCodes.INTERNAL_SERVER_ERROR,
+      "The cosmic forces are temporarily misaligned"
     );
   }
 }
@@ -150,6 +178,9 @@ async function saveAnonymousVote(
     }
   } catch (error) {
     console.error('Error saving anonymous vote:', error);
-    throw error;
+    throw new TarotAPIError(
+      StatusCodes.INTERNAL_SERVER_ERROR,
+      "The cosmic forces could not record your spiritual resonance"
+    );
   }
 }

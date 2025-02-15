@@ -1,33 +1,27 @@
 import { StatusCodes } from 'http-status-codes';
+import { z } from 'zod';
 
-export const TarotErrors = {
-    [StatusCodes.UNAUTHORIZED]: {
-        message: "The cards sense a presence without proper attunement. Please authenticate your spiritual connection.",
-        code: StatusCodes.UNAUTHORIZED
-    },
-    [StatusCodes.NOT_FOUND]: {
-        message: "The mists of time obscure this path. The cards you seek remain hidden from view.",
-        code: StatusCodes.NOT_FOUND
-    },
-    [StatusCodes.BAD_REQUEST]: {
-        message: "The cards whisper of confusion. Your request needs clearer intention.",
-        code: StatusCodes.BAD_REQUEST
-    },
-    [StatusCodes.TOO_MANY_REQUESTS]: {
-        message: "The cards request patience. Too many readings in quick succession cloud their vision.",
-        code: StatusCodes.TOO_MANY_REQUESTS
-    },
-    [StatusCodes.INTERNAL_SERVER_ERROR]: {
-        message: "The cosmic energies are temporarily misaligned. The cards request a moment to realign.",
-        code: StatusCodes.INTERNAL_SERVER_ERROR
-    },
-    [StatusCodes.FORBIDDEN]: {
-        message: "The cards guard their secrets. This reading is meant for other eyes.",
-        code: StatusCodes.FORBIDDEN
-    }
+const TAROT_ERROR_CODES = {
+    [StatusCodes.UNAUTHORIZED]: StatusCodes.UNAUTHORIZED,
+    [StatusCodes.NOT_FOUND]: StatusCodes.NOT_FOUND,
+    [StatusCodes.BAD_REQUEST]: StatusCodes.BAD_REQUEST,
+    [StatusCodes.TOO_MANY_REQUESTS]: StatusCodes.TOO_MANY_REQUESTS,
+    [StatusCodes.INTERNAL_SERVER_ERROR]: StatusCodes.INTERNAL_SERVER_ERROR,
+    [StatusCodes.FORBIDDEN]: StatusCodes.FORBIDDEN,
+    [StatusCodes.METHOD_NOT_ALLOWED]: StatusCodes.METHOD_NOT_ALLOWED,
+} as const;
+
+export const TarotErrorMessages: Record<keyof typeof TAROT_ERROR_CODES, string> = {
+    [StatusCodes.UNAUTHORIZED]: "The cards sense a presence without proper attunement. Please authenticate your spiritual connection.",
+    [StatusCodes.NOT_FOUND]: "The mists of time obscure this path. The cards you seek remain hidden from view.",
+    [StatusCodes.BAD_REQUEST]: "The cards whisper of confusion. Your request needs clearer intention.",
+    [StatusCodes.TOO_MANY_REQUESTS]: "The cards request patience. Too many readings in quick succession cloud their vision.",
+    [StatusCodes.INTERNAL_SERVER_ERROR]: "The cosmic energies are temporarily misaligned. The cards request a moment to realign.",
+    [StatusCodes.FORBIDDEN]: "The cards guard their secrets. This reading is meant for other eyes.",
+    [StatusCodes.METHOD_NOT_ALLOWED]: "The cosmic forces do not recognize this form of communion.",
 };
 
-export const DatabaseErrors = {
+export const DatabaseErrorMessages = {
     USER_NOT_FOUND: "🔮 The mystical forces failed to locate your spiritual presence in our realm",
     USER_CREATE_FAILED: "🌙 The stars could not align to create your spiritual pathway",
     CHAT_SAVE_FAILED: "📜 The ethereal scrolls rejected your message",
@@ -47,12 +41,53 @@ export const DatabaseErrors = {
     MESSAGE_BY_ID_FAILED: "📿 This spiritual message has vanished into the astral plane",
     MESSAGE_DELETE_FAILED: "🌙 The cosmic winds have swept away these messages into the void",
     CHAT_VISIBILITY_UPDATE_FAILED: "🌟 The veil between realms could not be adjusted as requested"
+} as const;
+
+export const TarotErrorSchema = z.object({
+    code: z.nativeEnum(StatusCodes),
+    message: z.string(),
+    details: z.any().optional(),
+});
+
+export type TarotError = z.infer<typeof TarotErrorSchema>;
+
+export const TarotResponseSchema = z.object({
+    success: z.boolean(),
+    data: z.any().optional(),
+    error: TarotErrorSchema.optional(),
+});
+
+export type TarotResponse<T = any> = z.infer<typeof TarotResponseSchema> & {
+    data?: T;
 };
 
-export function createTarotError(statusCode: StatusCodes, customMessage?: string) {
-    const error = TarotErrors[statusCode as keyof typeof TarotErrors];
-    return {
-        error: customMessage || error.message,
-        code: error.code
-    };
+export function createTarotError(statusCode: keyof typeof TAROT_ERROR_CODES, customMessage?: string, details?: any): TarotError {
+    return TarotErrorSchema.parse({
+        code: statusCode,
+        message: customMessage || TarotErrorMessages[statusCode] || "The cosmic forces are in disarray",
+        details,
+    });
+}
+
+export function createTarotResponse<T = any>(data?: T, error?: TarotError): TarotResponse<T> {
+    return TarotResponseSchema.parse({
+        success: !error,
+        data,
+        error,
+    });
+}
+
+export class TarotAPIError extends Error {
+    constructor(
+        public readonly statusCode: keyof typeof TAROT_ERROR_CODES,
+        message?: string,
+        public readonly details?: any
+    ) {
+        super(message || TarotErrorMessages[statusCode]);
+        this.name = 'TarotAPIError';
+    }
+
+    toResponse(): TarotResponse {
+        return createTarotResponse(undefined, createTarotError(this.statusCode, this.message, this.details));
+    }
 }

@@ -20,13 +20,13 @@ import {
   messageTheme,
 } from './schema';
 import { db } from './client';
-import { DatabaseErrors } from '../errors';
+import { DatabaseErrorMessages } from '../errors';
 
 export async function getUser(email: string): Promise<Array<User>> {
   try {
     return await db.select().from(user).where(eq(user.email, email));
   } catch (error) {
-    console.error(DatabaseErrors.USER_NOT_FOUND);
+    console.error(DatabaseErrorMessages.USER_NOT_FOUND);
     throw error;
   }
 }
@@ -42,7 +42,7 @@ export async function createUser(email: string, password: string) {
     };
     return await db.insert(user).values(newUser);
   } catch (error) {
-    console.error(DatabaseErrors.USER_CREATE_FAILED);
+    console.error(DatabaseErrorMessages.USER_CREATE_FAILED);
     throw error;
   }
 }
@@ -69,7 +69,7 @@ export async function saveChat({
     };
     return await db.insert(chat).values(newChat);
   } catch (error) {
-    console.error(DatabaseErrors.CHAT_SAVE_FAILED);
+    console.error(DatabaseErrorMessages.CHAT_SAVE_FAILED);
     throw error;
   }
 }
@@ -80,7 +80,7 @@ export async function deleteChatById({ id }: { id: string }) {
     await db.delete(message).where(eq(message.chatId, id));
     return await db.delete(chat).where(eq(chat.id, id));
   } catch (error) {
-    console.error(DatabaseErrors.CHAT_DELETE_FAILED);
+    console.error(DatabaseErrorMessages.CHAT_DELETE_FAILED);
     throw error;
   }
 }
@@ -93,7 +93,7 @@ export async function getChatsByUserId({ id }: { id: string }) {
       .where(eq(chat.userId, id))
       .orderBy(desc(chat.createdAt));
   } catch (error) {
-    console.error(DatabaseErrors.CHAT_FETCH_FAILED);
+    console.error(DatabaseErrorMessages.CHAT_FETCH_FAILED);
     throw error;
   }
 }
@@ -103,7 +103,7 @@ export async function getChatById({ id }: { id: string }) {
     const [selectedChat] = await db.select().from(chat).where(eq(chat.id, id));
     return selectedChat;
   } catch (error) {
-    console.error(DatabaseErrors.CHAT_BY_ID_FAILED);
+    console.error(DatabaseErrorMessages.CHAT_BY_ID_FAILED);
     throw error;
   }
 }
@@ -112,7 +112,7 @@ export async function saveMessages({ messages }: { messages: Array<Message> }) {
   try {
     return await db.insert(message).values(messages);
   } catch (error) {
-    console.error(DatabaseErrors.MESSAGE_SAVE_FAILED);
+    console.error(DatabaseErrorMessages.MESSAGE_SAVE_FAILED);
     throw error;
   }
 }
@@ -125,7 +125,7 @@ export async function getMessagesByChatId({ id }: { id: string }) {
       .where(eq(message.chatId, id))
       .orderBy(asc(message.createdAt));
   } catch (error) {
-    console.error(DatabaseErrors.MESSAGE_FETCH_FAILED);
+    console.error(DatabaseErrorMessages.MESSAGE_FETCH_FAILED);
     throw error;
   }
 }
@@ -162,7 +162,7 @@ export async function voteMessage({
     };
     return await db.insert(vote).values(newVote);
   } catch (error) {
-    console.error(DatabaseErrors.VOTE_SAVE_FAILED);
+    console.error(DatabaseErrorMessages.VOTE_SAVE_FAILED);
     throw error;
   }
 }
@@ -171,7 +171,7 @@ export async function getVotesByChatId({ id }: { id: string }) {
   try {
     return await db.select().from(vote).where(eq(vote.chatId, id));
   } catch (error) {
-    console.error(DatabaseErrors.VOTE_FETCH_FAILED);
+    console.error(DatabaseErrorMessages.VOTE_FETCH_FAILED);
     throw error;
   }
 }
@@ -197,7 +197,7 @@ export async function saveDocument({
     };
     return await db.insert(document).values(newDocument);
   } catch (error) {
-    console.error(DatabaseErrors.DOCUMENT_SAVE_FAILED);
+    console.error(DatabaseErrorMessages.DOCUMENT_SAVE_FAILED);
     throw error;
   }
 }
@@ -212,7 +212,7 @@ export async function getDocumentsById({ id }: { id: string }) {
 
     return documents;
   } catch (error) {
-    console.error(DatabaseErrors.DOCUMENT_FETCH_FAILED);
+    console.error(DatabaseErrorMessages.DOCUMENT_FETCH_FAILED);
     throw error;
   }
 }
@@ -227,7 +227,7 @@ export async function getDocumentById({ id }: { id: string }) {
 
     return selectedDocument;
   } catch (error) {
-    console.error(DatabaseErrors.DOCUMENT_BY_ID_FAILED);
+    console.error(DatabaseErrorMessages.DOCUMENT_BY_ID_FAILED);
     throw error;
   }
 }
@@ -253,7 +253,7 @@ export async function deleteDocumentsByIdAfterTimestamp({
       .delete(document)
       .where(and(eq(document.id, id), gt(document.createdAt, timestamp)));
   } catch (error) {
-    console.error(DatabaseErrors.DOCUMENT_DELETE_FAILED);
+    console.error(DatabaseErrorMessages.DOCUMENT_DELETE_FAILED);
     throw error;
   }
 }
@@ -266,7 +266,7 @@ export async function saveSuggestions({
   try {
     return await db.insert(suggestion).values(suggestions);
   } catch (error) {
-    console.error(DatabaseErrors.SUGGESTION_SAVE_FAILED);
+    console.error(DatabaseErrorMessages.SUGGESTION_SAVE_FAILED);
     throw error;
   }
 }
@@ -282,7 +282,7 @@ export async function getSuggestionsByDocumentId({
       .from(suggestion)
       .where(eq(suggestion.documentId, documentId));
   } catch (error) {
-    console.error(DatabaseErrors.SUGGESTION_FETCH_FAILED);
+    console.error(DatabaseErrorMessages.SUGGESTION_FETCH_FAILED);
     throw error;
   }
 }
@@ -291,7 +291,7 @@ export async function getMessageById({ id }: { id: string }) {
   try {
     return await db.select().from(message).where(eq(message.id, id));
   } catch (error) {
-    console.error(DatabaseErrors.MESSAGE_BY_ID_FAILED);
+    console.error(DatabaseErrorMessages.MESSAGE_BY_ID_FAILED);
     throw error;
   }
 }
@@ -310,7 +310,7 @@ export async function deleteMessagesByChatIdAfterTimestamp({
         and(eq(message.chatId, chatId), gte(message.createdAt, timestamp)),
       );
   } catch (error) {
-    console.error(DatabaseErrors.MESSAGE_DELETE_FAILED);
+    console.error(DatabaseErrorMessages.MESSAGE_DELETE_FAILED);
     throw error;
   }
 }
@@ -325,7 +325,7 @@ export async function updateChatVisiblityById({
   try {
     return await db.update(chat).set({ visibility }).where(eq(chat.id, chatId));
   } catch (error) {
-    console.error(DatabaseErrors.CHAT_VISIBILITY_UPDATE_FAILED);
+    console.error(DatabaseErrorMessages.CHAT_VISIBILITY_UPDATE_FAILED);
     throw error;
   }
 }

@@ -1,0 +1,166 @@
+# Lacanian Tarot Bot - AI Agent and Chat Application
+
+This project combines an AI-powered API agent with a modern chat interface to create a unique Tarot reading experience through a Lacanian psychoanalytic lens. The system interprets Tarot cards using Lacanian concepts of the Real, Symbolic, and Imaginary orders, providing insights that bridge divination with psychoanalytic theory.
+
+## Core Components
+
+1. AI Agent Architecture
+   - OpenAI GPT-4 integration for Lacanian interpretation
+   - Persona management for consistent analytical voice
+   - Card selection system influenced by user's symbolic patterns
+   - Stream-based response handling for real-time readings
+
+2. Chat Interface
+   - Real-time interaction with the Tarot AI
+   - Spread visualization and card interpretation
+   - Progressive message history with psychoanalytic context
+   - User preference tracking for personalized readings
+
+## Technical Stack
+
+This application is built using modern web technologies:
+- Next.js 15 (App Router) for server-side rendering and API routes
+- TypeScript for type-safe development
+- Vercel AI SDK for streaming AI responses
+- Tailwind CSS with Shadcn UI for responsive design
+- Drizzle ORM for database management
+- React 19 for component architecture
+
+## Infrastructure Setup
+
+### Database & Storage Services
+
+Production Environment:
+- Vercel for application hosting and serverless functions
+- Neon for PostgreSQL with pgvector extension (production database)
+- Upstash for Redis (production caching and rate limiting)
+- Vercel Blob Storage for file storage
+
+Local Development Environment:
+- Docker Compose setup for local development and testing
+- Local PostgreSQL with pgvector extension via ankane/pgvector image
+- Local Redis instance with HTTP proxy (hiett/serverless-redis-http)
+- MinIO for local S3-compatible storage
+- WebSocket proxy for Postgres connections
+
+Always use the provided `docker-compose.yml` for local development and testing:
+- Use port 5432 for direct Postgres connections
+- Use port 5433 for WebSocket proxy connections to Postgres
+- Use port 6379 for direct Redis connections
+- Use port 8079 for Redis HTTP API
+- Use port 9000 for MinIO API
+- Use port 9001 for MinIO Console
+
+## Development Guidelines
+
+### Code Architecture
+
+- Implement Server Components where possible
+- Use TypeScript for type safety
+- Follow functional programming patterns
+- Maintain clear separation between UI and logic
+- Structure components for reusability
+
+### State Management
+
+- Leverage React Server Components
+- Use URL state for sharing readings
+- Implement optimistic updates
+- Handle streaming data efficiently
+
+### API Design
+
+- RESTful endpoints for chat interactions
+- Streaming responses for real-time readings
+- Proper error handling with psychoanalytic theming
+- Session management for reading continuity
+
+### Data Flow
+
+- Implement unidirectional data flow patterns
+- Use React Query for server state management
+- Implement proper caching strategies for readings
+- Handle real-time updates through WebSocket connections
+- Maintain consistent state between client and server
+- Implement proper error boundaries and fallbacks
+
+### Testing Strategy
+
+- Unit tests for card interpretation logic
+- Integration tests for chat flows
+- End-to-end tests for complete reading sessions
+- Performance testing for streaming responses
+- Accessibility testing for UI components
+- Test coverage requirements: minimum 80%
+
+### Security Considerations
+
+- Implement rate limiting for API endpoints
+- Secure storage of user reading history
+- Input sanitization for chat messages
+- CORS configuration for API endpoints
+- API authentication and authorization
+- Data encryption for sensitive information
+
+### Performance Optimization
+
+- Implement proper code splitting
+- Optimize image loading for card artwork
+- Use proper caching strategies
+- Implement progressive loading
+- Optimize bundle size
+- Monitor and optimize API response times
+
+### Deployment Guidelines
+
+- Use CI/CD pipeline for automated deployments
+- Implement staging environment for testing
+- Monitor application metrics
+- Set up error tracking and logging
+- Configure proper environment variables
+- Implement backup and recovery procedures
+
+### Documentation Requirements
+
+- Maintain up-to-date API documentation
+- Document component usage and props
+- Include setup instructions for local development
+- Document deployment procedures
+- Maintain changelog for version updates
+- Include troubleshooting guides
+
+### Accessibility Standards
+
+- Follow WCAG 2.1 guidelines
+- Implement proper ARIA labels
+- Ensure keyboard navigation
+- Maintain proper color contrast
+- Support screen readers
+- Implement focus management
+
+### Internationalization
+
+- Implement multi-language support
+- Handle right-to-left languages
+- Format dates and times properly
+- Support different cultural contexts
+- Implement proper string management
+- Handle currency formatting
+
+### Analytics and Monitoring
+
+- Track user engagement metrics
+- Monitor API performance
+- Track error rates and types
+- Implement user feedback collection
+- Monitor system resource usage
+- Track reading session completion rates
+
+### Version Control Guidelines
+
+- Follow conventional commits
+- Maintain clean git history
+- Implement proper branching strategy
+- Require code review process
+- Automate version bumping
+- Tag releases properly
