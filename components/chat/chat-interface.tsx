@@ -7,8 +7,7 @@ import { cn } from '@/lib/utils';
 import { SpreadSelector } from '../spread/SpreadSelector';
 import { SpreadDisplay } from '../spread/SpreadDisplay';
 import { PREDEFINED_SPREADS } from '@/lib/spreads';
-import type { Spread, TarotCard as TarotCardType } from '@/lib/db/schema';
-import type { SpreadPosition } from '@/lib/spreads';
+import type { Spread, TarotCard as TarotCardType, SpreadPosition } from '@/lib/db/types';
 
 interface Message {
     id: string;

@@ -1,10 +1,7 @@
-import { db } from './db/client';
-import { spread as spreadTable } from './db/schema';
-import { eq } from 'drizzle-orm';
 import type { PersonalizedCardSelector } from './card-selector';
 import type { UserPersona } from './persona';
-import type { TarotCard } from './db/schema';
-import type { InferSelectModel } from 'drizzle-orm';
+import type { Spread, TarotCard, SpreadPosition } from './db/types';
+import { spread as spreadTable } from './db/schema';
 
 export interface SpreadPosition {
     name: string;
@@ -13,7 +10,7 @@ export interface SpreadPosition {
     position: number;
 }
 
-export type Spread = InferSelectModel<typeof spreadTable>;
+export type Spread = Spread;
 
 export const PREDEFINED_SPREADS: Record<string, Omit<Spread, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> = {
     'past-present-future': {
@@ -48,32 +45,32 @@ export const PREDEFINED_SPREADS: Record<string, Omit<Spread, 'id' | 'userId' | '
         positions: [
             {
                 name: 'Present',
-                description: 'The current situation or question',
+                description: 'The current situation',
                 themeMultiplier: 1.2,
                 position: 1
             },
             {
                 name: 'Challenge',
-                description: 'What crosses or challenges you',
-                themeMultiplier: 1.1,
+                description: 'What crosses you',
+                themeMultiplier: 1.0,
                 position: 2
             },
             {
                 name: 'Foundation',
                 description: 'The basis of the situation',
-                themeMultiplier: 0.9,
+                themeMultiplier: 0.8,
                 position: 3
             },
             {
                 name: 'Past',
                 description: 'Recent past influences',
-                themeMultiplier: 0.8,
+                themeMultiplier: 0.7,
                 position: 4
             },
             {
                 name: 'Crown',
-                description: 'Potential outcome',
-                themeMultiplier: 1.0,
+                description: 'Your thoughts and aspirations',
+                themeMultiplier: 1.1,
                 position: 5
             },
             {
@@ -84,26 +81,26 @@ export const PREDEFINED_SPREADS: Record<string, Omit<Spread, 'id' | 'userId' | '
             },
             {
                 name: 'Self',
-                description: 'Your attitude and approach',
-                themeMultiplier: 1.1,
+                description: 'How you see yourself',
+                themeMultiplier: 1.2,
                 position: 7
             },
             {
                 name: 'Environment',
-                description: 'External influences',
+                description: 'How others see you',
                 themeMultiplier: 0.9,
                 position: 8
             },
             {
                 name: 'Hopes/Fears',
-                description: 'Your inner emotions',
+                description: 'Your hopes and fears',
                 themeMultiplier: 1.1,
                 position: 9
             },
             {
                 name: 'Outcome',
-                description: 'Final outcome',
-                themeMultiplier: 1.2,
+                description: 'The final outcome',
+                themeMultiplier: 1.3,
                 position: 10
             }
         ]
@@ -118,13 +115,14 @@ export class SpreadManager {
     }
 
     async getSpread(spreadId: string): Promise<Spread | null> {
-        const result = await db
-            .select()
-            .from(spreadTable)
-            .where(eq(spreadTable.id, spreadId))
-            .limit(1);
-
-        return result[0] || null;
+        try {
+            const response = await fetch(`/api/spreads?id=${spreadId}`);
+            if (!response.ok) return null;
+            return response.json();
+        } catch (error) {
+            console.error('Failed to fetch spread:', error);
+            return null;
+        }
     }
 
     async drawSpreadCards(
@@ -133,114 +131,83 @@ export class SpreadManager {
         userQuery?: string
     ): Promise<Array<TarotCard & { position: SpreadPosition }>> {
         const spread = await this.getSpread(spreadId);
-        if (!spread) throw new Error(`Spread not found: ${spreadId}`);
+        if (!spread) throw new Error('Spread not found');
 
+        const positions = spread.positions as SpreadPosition[];
         const cards: Array<TarotCard & { position: SpreadPosition }> = [];
 
-        // Draw cards for each position
-        for (const position of spread.positions) {
+        for (const position of positions) {
             const [card] = await this.cardSelector.selectCards({
                 persona,
                 numCards: 1,
                 userQuery,
                 spreadPosition: position
             });
-
-            cards.push({
-                ...card,
-                position
-            });
+            cards.push({ ...card, position });
         }
 
         return cards;
     }
-
-    async createSpread(spread: Omit<Spread, 'id'>): Promise<Spread> {
-        const [result] = await db
-            .insert(spreadTable)
-            .values({
-                name: spread.name,
-                description: spread.description,
-                positions: spread.positions
-            })
-            .returning();
-
-        return result;
-    }
-
-    async listSpreads(): Promise<Spread[]> {
-        return db.select().from(spreadTable);
-    }
 }
 
 export async function getPublicSpreads(): Promise<Spread[]> {
-    return db.select().from(spreadTable).where(eq(spreadTable.isPublic, true));
+    try {
+        const response = await fetch('/api/spreads');
+        if (!response.ok) return [];
+        return response.json();
+    } catch (error) {
+        console.error('Failed to fetch public spreads:', error);
+        return [];
+    }
 }
 
 export async function getUserSpreads(userId: string): Promise<Spread[]> {
-    return db
-        .select()
-        .from(spreadTable)
-        .where(eq(spreadTable.userId, userId));
+    try {
+        const response = await fetch(`/api/spreads?userId=${userId}`);
+        if (!response.ok) return [];
+        return response.json();
+    } catch (error) {
+        console.error('Failed to fetch user spreads:', error);
+        return [];
+    }
 }
 
 export async function getSpreadById(id: string): Promise<Spread | undefined> {
-    const results = await db
-        .select()
-        .from(spreadTable)
-        .where(eq(spreadTable.id, id))
-        .limit(1);
-
-    return results[0];
+    try {
+        const response = await fetch(`/api/spreads?id=${id}`);
+        if (!response.ok) return undefined;
+        return response.json();
+    } catch (error) {
+        console.error('Failed to fetch spread:', error);
+        return undefined;
+    }
 }
 
 export async function createSpread(
     data: Omit<Spread, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<Spread> {
-    const [newSpread] = await db.insert(spreadTable).values({
-        ...data,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-    }).returning();
+    const response = await fetch('/api/spreads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
 
-    return newSpread;
-}
+    if (!response.ok) {
+        throw new Error('Failed to create spread');
+    }
 
-export async function updateSpread(
-    id: string,
-    data: Partial<Omit<Spread, 'id' | 'createdAt' | 'updatedAt'>>
-): Promise<Spread | undefined> {
-    const [updatedSpread] = await db
-        .update(spreadTable)
-        .set({
-            ...data,
-            updatedAt: new Date(),
-        })
-        .where(eq(spreadTable.id, id))
-        .returning();
-
-    return updatedSpread;
-}
-
-export async function deleteSpread(id: string): Promise<boolean> {
-    const [deletedSpread] = await db
-        .delete(spreadTable)
-        .where(eq(spreadTable.id, id))
-        .returning();
-
-    return !!deletedSpread;
+    return response.json();
 }
 
 export function validateSpreadPositions(positions: unknown): positions is SpreadPosition[] {
     if (!Array.isArray(positions)) return false;
-
-    return positions.every(position =>
-        typeof position === 'object' &&
-        position !== null &&
-        'name' in position &&
-        'description' in position &&
-        typeof position.name === 'string' &&
-        typeof position.description === 'string'
+    return positions.every(pos => 
+        typeof pos === 'object' &&
+        pos !== null &&
+        typeof pos.name === 'string' &&
+        typeof pos.description === 'string' &&
+        typeof pos.themeMultiplier === 'number' &&
+        typeof pos.position === 'number'
     );
 }
 

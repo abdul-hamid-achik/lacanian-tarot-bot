@@ -46,13 +46,14 @@ export async function drawPersonalizedCards(
 }
 
 export async function getCardById(id: string): Promise<TarotCard | undefined> {
-    const results = await db
-        .select()
-        .from(tarotCard)
-        .where(eq(tarotCard.id, id))
-        .limit(1);
-
-    return results[0];
+    try {
+        const response = await fetch(`/api/cards?id=${id}`);
+        if (!response.ok) return undefined;
+        return response.json();
+    } catch (error) {
+        console.error('Failed to fetch card:', error);
+        return undefined;
+    }
 }
 
 export async function getCardsByTheme(themeId: string): Promise<TarotCard[]> {
