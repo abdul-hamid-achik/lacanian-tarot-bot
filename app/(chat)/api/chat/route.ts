@@ -158,7 +158,7 @@ export async function POST(request: Request) {
         if (intent.type === 'spread' || intent.type === 'reading') {
           // Handle tarot reading
           const { numCards } = parseTarotRequest(content);
-          const userPersona = await personaManager.getPersona(user.id);
+          const userPersona = await personaManager.getPersona(user.id as string);
           const cards = await drawPersonalizedCards(numCards, userPersona);
           
           // Get spread if specified

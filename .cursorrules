@@ -5,7 +5,7 @@ This project combines an AI-powered API agent with a modern chat interface to cr
 ## Core Components
 
 1. AI Agent Architecture
-   - OpenAI GPT-4 integration for Lacanian interpretation
+   - OpenAI GPT-4o/GPT-4o-mini integration for Lacanian interpretation
    - Persona management for consistent analytical voice
    - Card selection system influenced by user's symbolic patterns
    - Stream-based response handling for real-time readings
@@ -51,6 +51,8 @@ Always use the provided `docker-compose.yml` for local development and testing:
 - Use port 9000 for MinIO API
 - Use port 9001 for MinIO Console
 
+Important: Never restart the local development server without explicit permission from the team lead.
+
 ## Development Guidelines
 
 ### Code Architecture
@@ -60,6 +62,8 @@ Always use the provided `docker-compose.yml` for local development and testing:
 - Follow functional programming patterns
 - Maintain clear separation between UI and logic
 - Structure components for reusability
+- Do not add comments unless specifically required by the task
+- Always use GPT-4o or GPT-4o-mini models exclusively for AI interactions
 
 ### State Management
 

@@ -1,18 +1,13 @@
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-});
+import { openai } from '@ai-sdk/openai';
 
 export class TextEmbedder {
     private model = 'text-embedding-3-small';
 
     async embed(text: string): Promise<number[]> {
-        const response = await openai.embeddings.create({
-            model: this.model,
-            input: text
+        const response = await openai.textEmbeddingModel(this.model).doEmbed({
+            values: [text]
         });
-        return response.data[0].embedding;
+        return response.embeddings[0];
     }
 
     async batchEmbed(texts: string[]): Promise<number[][]> {
@@ -22,11 +17,10 @@ export class TextEmbedder {
 
         for (let i = 0; i < texts.length; i += batchSize) {
             const batch = texts.slice(i, i + batchSize);
-            const response = await openai.embeddings.create({
-                model: this.model,
-                input: batch
+            const response = await openai.textEmbeddingModel(this.model).doEmbed({
+                values: batch
             });
-            batches.push(...response.data.map((d: { embedding: number[] }) => d.embedding));
+            batches.push(...response.embeddings);
         }
 
         return batches;
