@@ -19,10 +19,9 @@ import { getSpreadById } from '@/lib/spreads';
 import { StatusCodes } from 'http-status-codes';
 import { createTarotResponse, createTarotError, TarotAPIError } from '@/lib/errors';
 import { cookies } from 'next/headers';
-import { OpenAI } from 'openai';
-import { createDataStream, createDataStreamResponse } from 'ai';
+import { createDataStreamResponse, type DataStreamWriter } from 'ai';
 import { z } from 'zod';
-import { DataStreamWriter } from 'ai';
+import { systemPrompt, generateTarotPrompt } from '@/lib/ai/prompts';
 
 interface SpreadWithPositions extends Spread {
   positions: {
@@ -35,10 +34,6 @@ interface SpreadWithPositions extends Spread {
 
 const personaManager = new PersonaManager();
 const cardSelector = new PersonalizedCardSelector();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 async function drawRandomTarotCards(numCards: number) {
   return await db.select().from(cardReading).orderBy(sql`random()`).limit(numCards);
@@ -70,23 +65,20 @@ function parseTarotRequest(message: string): { numCards: number } {
   };
 }
 
-const ChatMessageSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system']),
+const MessageSchema = z.object({
+  role: z.string(),
   content: z.string(),
-  name: z.string().optional(),
 });
 
-type ChatMessage = z.infer<typeof ChatMessageSchema>;
-
 const ChatRequestSchema = z.object({
-  messages: z.array(z.object({
-    role: z.string(),
-    content: z.string()
-  })),
+  messages: z.array(MessageSchema).min(1),  // Ensure at least one message
   chatId: z.string(),
   userId: z.string().optional(),
   spread: z.any().optional()
 });
+
+type ChatRequest = z.infer<typeof ChatRequestSchema>;
+type Message = z.infer<typeof MessageSchema>;
 
 const ChatResponseSchema = z.object({
   id: z.string(),
@@ -113,28 +105,6 @@ const ChatVoteResponseSchema = z.object({
 const ChatDeleteResponseSchema = z.object({
   message: z.string(),
 });
-
-const StreamingResponseSchema = z.object({
-  statusText: z.string(),
-  headers: z.record(z.string()),
-  execute: z.function()
-    .args(z.custom<DataStreamWriter>())
-    .returns(z.promise(z.void()))
-});
-
-function generateUUID() {
-  const array = new Uint8Array(16);
-  globalThis.crypto.getRandomValues(array);
-  
-  array[6] = (array[6] & 0x0f) | 0x40;
-  array[8] = (array[8] & 0x3f) | 0x80;
-  
-  const hex = Array.from(array)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -163,107 +133,75 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth().catch((error) => {
-      console.error('Auth error:', error);
-      return null;
-    });
+    const session = await auth();
+    const user = session?.user;
+
+    if (!user || !user.id) {
+      throw new TarotAPIError(StatusCodes.UNAUTHORIZED, 'Unauthorized');
+    }
+
+    const json = await request.json();
+    const validatedRequest = ChatRequestSchema.parse(json);
+    const { messages } = validatedRequest;
     
-    const body = await request.json();
-    const { messages, chatId, userId: requestUserId, spread } = ChatRequestSchema.parse(body);
-
-    const latestMessage = messages[messages.length - 1].content;
-
-    const cookieStore = await cookies();
-    const sessionId = cookieStore.get('anonymous_session')?.value;
-
-    let anonymousUserId: string | undefined;
-    if (!session?.user) {
-      const anonUser = await getOrCreateAnonymousUser(sessionId || crypto.randomUUID());
-      anonymousUserId = anonUser.id;
-    }
-
-    const existingChat = await getChatById({ id: chatId }).catch((error) => {
-      console.error('Error getting chat:', error);
-      return null;
-    });
-
-    if (!existingChat) {
-      try {
-        const title = await generateTitleFromUserMessage({ 
-          message: { role: 'user', content: latestMessage } 
-        });
-        await saveChat({ 
-          id: chatId, 
-          userId: session?.user?.id,
-          anonymousUserId,
-          title 
-        });
-      } catch (error) {
-        console.error('Error creating chat:', error);
-        throw new TarotAPIError(StatusCodes.INTERNAL_SERVER_ERROR);
-      }
-    }
-
-    const userPersona = session?.user?.id 
-      ? await personaManager.getPersona(session.user.id)
-      : await personaManager.getPersona('anonymous', sessionId);
-
-    let selectedCards;
-    if (spread) {
-      selectedCards = await drawPersonalizedCards(spread.positions.length, userPersona);
-    }
-
-    const aiMessages = messages.map(m => ({
-      role: m.role as 'user' | 'assistant' | 'system',
-      content: m.content
-    }));
-
-    if (spread && selectedCards) {
-      aiMessages.unshift({
-        role: 'system',
-        content: JSON.stringify({
-          type: 'cards',
-          cards: selectedCards,
-          spread
-        })
-      });
-    }
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-0125-preview',
-      messages: aiMessages,
-      temperature: 0.7,
-      stream: true,
-    });
+    // Since we validated with .min(1) and MessageSchema requires content, we know these exist
+    const lastMessage = messages[messages.length - 1];
+    const content = lastMessage.content as string;
+    
+    // Process the tarot reading logic
+    const intent = detectTarotIntent(content);
 
     return createDataStreamResponse({
       statusText: 'OK',
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       execute: async (writer: DataStreamWriter) => {
-        for await (const chunk of response) {
-          const text = chunk.choices[0]?.delta?.content;
-          if (text) {
-            writer.write(text);
+        if (intent.type === 'spread' || intent.type === 'reading') {
+          // Handle tarot reading
+          const { numCards } = parseTarotRequest(content);
+          const userPersona = await personaManager.getPersona(user.id);
+          const cards = await drawPersonalizedCards(numCards, userPersona);
+          
+          // Get spread if specified
+          const spread = intent.spreadId ? await getSpreadById(intent.spreadId) : null;
+
+          // Use the centralized tarot prompt generator
+          const tarotSystemPrompt = generateTarotPrompt(cards, spread);
+          
+          // Write system prompt
+          await writer.write(`2:${tarotSystemPrompt}\n`);
+          
+          // Write messages
+          for (const msg of messages) {
+            await writer.write(`2:${JSON.stringify(msg)}\n`);
+          }
+        } else {
+          // Handle regular chat
+          // Write system prompt
+          await writer.write(`2:${systemPrompt}\n`);
+          
+          // Write messages
+          for (const msg of messages) {
+            await writer.write(`2:${JSON.stringify(msg)}\n`);
           }
         }
+        
+        // Write done signal
+        await writer.write('0:done\n');
       }
     });
-
+    
   } catch (error) {
-    console.error('Chat error:', error);
+    if (error instanceof TarotAPIError) {
+      return createTarotError(StatusCodes.UNAUTHORIZED, error.message);
+    }
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        createTarotResponse(undefined, createTarotError(StatusCodes.BAD_REQUEST, "The cards cannot interpret your request's pattern")),
-        { status: StatusCodes.BAD_REQUEST }
+      return createTarotError(
+        StatusCodes.BAD_REQUEST,
+        "The cosmic forces cannot interpret your message structure"
       );
     }
-    if (error instanceof TarotAPIError) {
-      return NextResponse.json(error.toResponse(), { status: error.statusCode });
-    }
-    return NextResponse.json(
-      createTarotResponse(undefined, createTarotError(StatusCodes.INTERNAL_SERVER_ERROR)),
-      { status: StatusCodes.INTERNAL_SERVER_ERROR }
-    );
+    console.error('Error in chat route:', error);
+    return createTarotError(StatusCodes.INTERNAL_SERVER_ERROR, 'Internal Server Error');
   }
 }
 
