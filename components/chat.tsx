@@ -54,7 +54,7 @@ export function Chat({
 
   // Only fetch votes if the chat is not readonly and there are messages
   const shouldFetchVotes = !isReadonly && messages.length > 0;
-  const { data: votes } = useSWR<Array<Vote>>(
+  const { data: votes = [] } = useSWR<Array<Vote>>(
     shouldFetchVotes ? `/api/vote?chatId=${id}` : null,
     fetcher,
     {
@@ -62,6 +62,15 @@ export function Chat({
       revalidateOnReconnect: false, // Don't revalidate when browser regains connection
       refreshInterval: 0, // Don't poll for updates
       dedupingInterval: 2000, // Dedupe requests within 2 seconds
+      fallbackData: [], // Provide an empty array as fallback
+      keepPreviousData: true, // Retain previous data while loading
+      onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
+        // Only retry if not a 404 and less than 3 attempts
+        if (error.status !== 404 && retryCount < 3) {
+          console.warn('Vote fetch error, retrying:', error);
+          revalidate({ retryCount });
+        }
+      }
     }
   );
 

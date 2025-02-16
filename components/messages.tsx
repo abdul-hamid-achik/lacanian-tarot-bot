@@ -47,7 +47,7 @@ function PureMessages({
           isLoading={isLoading && messages.length - 1 === index}
           vote={
             votes
-              ? votes.find((vote) => vote.messageId === message.id)
+              ? votes?.find?.((vote) => vote.messageId === message.id)
               : undefined
           }
           setMessages={setMessages}

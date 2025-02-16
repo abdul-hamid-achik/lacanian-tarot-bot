@@ -33,7 +33,9 @@ export const fetcher = async (url: string) => {
     throw error;
   }
 
-  return res.json();
+  const json = await res.json();
+  // Handle wrapped responses (e.g. {success: true, data: []})
+  return json.data !== undefined ? json.data : json;
 };
 
 export function getLocalStorage(key: string) {
